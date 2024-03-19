@@ -37,28 +37,25 @@ int main()
             //1 进度的可控性 2 对接的方便性 3 可行性评估，提早暴漏风险
             // TODO: socket,bind,listen,accept,read,write,close
             //套接字初始化
-            //server;
-            {
-                //CServerSocket local;
-            }
-            CServerSocket* pserver = CServerSocket::getInstance();
-            if (pserver) {
-                pserver->InitSocker();
-            }
-            CServerSocket::getInstance();
+
+            CServerSocket* pserver = CServerSocket::getInstance();//服务器创建单例
             int count = 0;
+            if (pserver->InitSocker() == false) {//初始化
+                MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状态！"), _T("网络初始化失败！"), MB_OK | MB_ICONERROR);
+                exit(0);
+            }
             while (CServerSocket::getInstance() != NULL) {
-                if (pserver->InitSocket() == false) {
-                    MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状态！"), _T("网络初始化失败！"), MB_OK | MB_ICONERROR);
-                    exit(0);
-                }
-                if(pserver->AcceptClient() == false){
-                    if(count >= 3){
+                if (pserver->AcceptClient() == false) {
+                    if (count >= 3) {
                         MessageBox(NULL, _T("多次无法接入用户，结束程序！"), _T("接入用户失败！"), MB_OK | MB_ICONERROR);
                         exit(0);
                     }
                     MessageBox(NULL, _T("无法正常接入用户，自动重试"), _T("接入用户失败！"), MB_OK | MB_ICONERROR);
                     count++;
+                }
+                int ret = pserver->DealCommand();
+                //TODO:
+            }
             //静态变量
             //在第一次调用的时候初始化，在程序销毁的时候被销毁
             //全局静态变量

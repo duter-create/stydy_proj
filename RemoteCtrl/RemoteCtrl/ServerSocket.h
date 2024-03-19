@@ -36,8 +36,6 @@ public:
 		m_client = accept(m_sock, (sockaddr*)&client_adr, &cli_sz);
 		if (m_client == -1)return false;
 		return true;
-		recv(m_client, buffer, sizeof(buffer), 0);
-		send(m_client, buffer, sizeof(buffer), 0);
 
 	}
 	int DealCommand() {
@@ -60,8 +58,12 @@ private:
 	SOCKET m_sock;
 	SOCKET m_client;
 	CServerSocket& operator=(const CServerSocket& ss) {}
-	CServerSocket(const CServerSocket&) {}
+	CServerSocket(const CServerSocket& ss) {
+		m_client = ss.m_client;
+		m_sock = ss.m_sock;
+	}
 	CServerSocket() {
+		m_client = INVALID_SOCKET;
 		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境,请检查网络设置"), _T("初始化错误"), MB_OK | MB_ICONERROR);
 			exit(0);
