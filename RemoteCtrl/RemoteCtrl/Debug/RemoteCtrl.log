@@ -1,8 +1,6 @@
-﻿  pch.cpp
-  RemoteCtrl.cpp
+﻿  RemoteCtrl.cpp
   ServerSocket.cpp
   正在生成代码...
-E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\ServerSocket.h(83,1): warning C4715: “CServerSocket::getInstance”: 不是所有的控件路径都返回值
-E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\ServerSocket.h(83,1): warning C4715: “CServerSocket::getInstance”: 不是所有的控件路径都返回值
-E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\ServerSocket.h(65,1): warning C4715: “CPacket::operator=”: 不是所有的控件路径都返回值
+E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\ServerSocket.h(114,1): warning C4715: “CServerSocket::getInstance”: 不是所有的控件路径都返回值
+LINK : warning LNK4044: 无法识别的选项“/FS”；已忽略
   RemoteCtrl.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteCtrl.exe
