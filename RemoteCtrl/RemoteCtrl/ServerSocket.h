@@ -9,7 +9,7 @@ class CPacket
 {
 public:
 	CPacket():sHead(0),nLength(0),sCmd(0),sSum(0) {}
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {//根据给定的参数来构建CPacket对象
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
 		sCmd = nCmd;
@@ -22,14 +22,14 @@ public:
 		}
 
 	}
-	CPacket(const CPacket& pack) {
+	CPacket(const CPacket& pack) {//拷贝构造
 		sHead = pack.sHead;
 		nLength = pack.nLength;
 		sCmd = pack.sCmd;
 		strData = pack.strData;
 		sSum = pack.sSum;
 	}
-	CPacket(const BYTE* pData, size_t& nSize) {
+	CPacket(const BYTE* pData, size_t& nSize) {//找包头
 		size_t i = 0;
 		for (; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {
@@ -38,7 +38,7 @@ public:
 				break;
 			}
 		}
-		if ((i+4+2+2) > nSize) {//包数据可能不全，或者包头未能全部接收到
+		if ((i+4+2+2) > nSize) {//加上4字节长度字段，命令字段（2字节），校验和字段（2字节）包数据可能不全，或者包头未能全部接收到
 			nSize = 0;
 			return;
 		}
@@ -82,9 +82,9 @@ public:
 	int Size() {//包数据的大小
 		return nLength + 6;
 	}
-	const char* Data() {
+	const char* Data() {//将CPacket对象的各个部分组合起来，并返回指向序列开头的const char*指针
 		strOut.resize(nLength + 6);
-		BYTE* pData = (BYTE*)strOut.c_str();
+		BYTE* pData = (BYTE*)strOut.c_str();//对pData操作影响strOut内容
 		*(WORD*)pData = sHead; pData += 2;
 		*(DWORD*)pData = nLength; pData += 4;
 		*(WORD*)pData = sCmd; pData += 2;
@@ -109,10 +109,9 @@ public:
 		if (m_instance == NULL) {//静态函数没有this指针，不能直接访问成员变量
 			m_instance = new CServerSocket();
 		}
-		else
-			return m_instance;
+		return m_instance; 
 	}
-	bool InitSocker() {
+	bool InitSocket() {
 		
 		if (m_sock == -1)return false;
 		sockaddr_in serv_adr;
@@ -140,7 +139,7 @@ public:
 
 	}
 #define BUFFER_SIZE 4096
-	int  DealCommand() {
+	int  DealCommand() {//处理接收到的网络命令
 		if (m_client == -1)return -1;
 		//char buffer[1024] = "";
 		char* buffer = new char[BUFFER_SIZE];
@@ -170,7 +169,14 @@ public:
 		if (m_client == -1)return false;
 		return (send(m_client, pack.Data(), pack.Size(), 0)) > 0;
 	}
-
+	bool GetFilePath(std::string& strPath) {
+		if (m_packet.sCmd == 2) {//获取文件列表
+			strPath = m_packet.strData;
+			return true;
+		}
+		else
+			return false;
+	}
 private:
 	SOCKET m_sock;
 	SOCKET m_client;
@@ -208,7 +214,7 @@ private:
 	}
 	static CServerSocket* m_instance;
 
-	class CHelper {
+	class CHelper {//在单例模式中管理生命周期，确保单例的实例正确的在程序结束时被销毁
 	public:
 		CHelper(){
 			CServerSocket::getInstance();
