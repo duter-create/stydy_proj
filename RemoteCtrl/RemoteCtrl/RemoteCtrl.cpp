@@ -69,19 +69,19 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
         OutputDebugString(_T("当前的命令，不是获取文件列表，命令解析错误"));
         return -1;
     }
-    if (_chdir(strPath.c_str()) != 0) {
-        FILEINFO finfo;
-        finfo.IsInvalid = TRUE;
-        finfo.IsDirectory = TRUE;
-        finfo.HasNext = FALSE;
-        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
+    if (_chdir(strPath.c_str()) != 0) {//更改当前工作目录为strpath指向的路径
+        FILEINFO finfo;//当目录由于权限不足无法切换时
+        finfo.IsInvalid = TRUE;//文件信息无效
+        finfo.IsDirectory = TRUE;//是目录
+        finfo.HasNext = FALSE;//没有更多的信息要发送
+        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());// 将 strPath 中的字符串复制到 finfo.szFileName 中，作为无法访问的路径名
         //lstFileInfos.pushback(finfo);
         CPacket pack(2, (BYTE*) & finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
         OutputDebugString(_T("没有权限访问目录"));
         return -2;
     }
-    _finddata_t fdata;
+    _finddata_t fdata;//存储文件查找信息
     int hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1) {
         OutputDebugString(_T("没有找到任何文件"));
@@ -89,12 +89,12 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
     }
     do {
         FILEINFO finfo;
-        finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
+        finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;//判断当前处理的文件项是不是目录
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
         //lstFileInfos.push_back(finfo);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
-    } while (!_findnext(hfind, &fdata));
+    } while (!_findnext(hfind, &fdata));//获取下一个文件项信息
     //发送信息到客户端 
     FILEINFO finfo;
     finfo.HasNext = FALSE;
@@ -102,6 +102,55 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
     CServerSocket::getInstance()->Send(pack);
     return 0;
 }
+
+int RunFile() {
+    std::string strPath;
+    CServerSocket::getInstance()->GetFilePath(strPath);
+    ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);//将在用户的机器上运行一个程序或打开一个文件，具体行为取决于文件类型的关联程序。比如，如果路径是一个可执行文件，则会运行该程序；如果路径是文档文件，则会打开与之关联的应用程序查看该文档。
+    /*
+    ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);：调用 Win32 API 函数 ShellExecuteA 来执行或打开 strPath 变量中的文件。此函数的参数解释如下：
+    NULL：表示函数不需要使用窗口句柄。
+    NULL：操作设为 NULL 表示执行文件，默认操作通常是“打开”。
+    strPath.c_str()：指定要运行或打开的文件的路径。
+    NULL：没有要传递给要执行的程序的参数。
+    NULL：默认目录设置为 NULL，所以执行文件时会使用它的默认目录。
+    SW_SHOWNORMAL：指定窗口的显示方式，SW_SHOWNORMAL 为普通窗口大小。
+    */
+    CPacket pack(3, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
+    return 0;
+}
+
+//#pragma warning(disable:4966)
+int DownloadFile() {//下载文件，即把文件从服务端发送到客户端
+    std::string strPath;
+    CServerSocket::getInstance()->GetFilePath(strPath);
+    long long data = 0;
+    FILE* pFile = NULL;
+    errno_t err = fopen_s(&pFile,strPath.c_str(),"rb");//rb:二进制读取模式，文件指针pfile
+    if (err != 0) {//打开文件失败
+        CPacket pack(4, (BYTE*)&data,8);
+        CServerSocket::getInstance()->Send(pack);
+        return -1;
+    }
+    if (pFile != NULL) {
+        fseek(pFile, 0, SEEK_END);//用fseek函数将文件指针pfile移动到文件末尾
+        data = _ftelli64(pFile);//_ftelli64：获取文件大小
+        CPacket head(4, (BYTE*)&data, 8);
+        fseek(pFile, 0, SEEK_SET);//用fseek函数将文件指针pfile定位到文件起始位置
+        char buffer[1024] = "";
+        size_t rlen = 0;//fread返回值
+        do {
+            rlen = fread(buffer, 1, 1024, pFile);//在buffer里读，一次读1字节，读1024次
+            CPacket pack(4, (BYTE*)buffer, rlen);
+            CServerSocket::getInstance()->Send(pack);
+        } while (rlen >= 1024);
+        fclose(pFile);
+    }
+    CPacket pack(4, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
+    return 0;
+} 
 
 int main()
 {
@@ -153,6 +202,13 @@ int main()
             case 2://查看指定目录下的文件
                 MakeDirectoryInfo();
                 break;
+            case 3://打开文件
+                RunFile();
+                break;
+            case 4:// 下载文件
+                DownloadFile();
+                break;
+
             }
 
         }
