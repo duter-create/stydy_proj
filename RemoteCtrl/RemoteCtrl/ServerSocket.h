@@ -107,6 +107,19 @@ public:
 	WORD sSum;//和校验
 	std::string strOut;//整个包的数据
 };
+#pragma pack(pop)
+
+typedef struct MouseEvent{
+	MouseEvent() {
+		nAction = 0;
+		nButton = -1;
+		ptXY.x = 0;
+		ptXY.y = 0;
+	}
+	WORD nAction;//点击，移动，双击
+	WORD nButton;//左键，右键，中键
+	POINT ptXY;//坐标
+}MOUSEEV,*PMOUSEEV;
 
 class CServerSocket
 {
@@ -183,9 +196,16 @@ public:
 		else
 			return false;
 	}
+	bool GetMouseEvent(MOUSEEV& mouse) {
+		if (m_packet.sCmd == 5) {
+			memcpy(&mouse, m_packet.strData.c_str(), sizeof(MOUSEEV));
+			return true;
+		}
+		return false;
+	}
 private:
 	SOCKET m_sock;
-	SOCKET m_client;
+	SOCKET m_client;	
 	CPacket m_packet;
 	CServerSocket& operator=(const CServerSocket& ss) {}
 	CServerSocket(const CServerSocket& ss) {
