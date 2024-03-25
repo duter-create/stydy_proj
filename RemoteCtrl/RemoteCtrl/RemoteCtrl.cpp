@@ -253,17 +253,19 @@ int MouseEvent() {//处理鼠标事件
 
 int SendScreen() {
     CImage screen;//GDI(全局设备接口)
-    HDC hScreen = ::GetDC(NULL);
+    HDC hScreen = ::GetDC(NULL);//获取设备上下文（整个屏幕）句柄，HDC(Handle to device context
+    //::表示是全局函数，即需要创建对象就可以直接调用该函数，且该函数定义在全局命名空间中。
+    //获取每个像素的位数，屏幕高度和宽度
     int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);
     int nWidth = GetDeviceCaps(hScreen, HORZRES);
     int nHeight = GetDeviceCaps(hScreen, VERTRES);
-    screen.Create(nWidth, nHeight, nBitPerPixel);
-    BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY);
+    screen.Create(nWidth, nHeight, nBitPerPixel);//用上面的参数来创建screen图片对象
+    BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY); //使用 BitBlt 函数来将屏幕的图像复制到 screen 对象中
     ReleaseDC(NULL, hScreen);
-    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
-    if (hMem == NULL)
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);//分配全局内存对象，准备使用后续内存流
+    if (hMem == NULL)//全局内存分配失败
         return -1;
-    IStream* pStream = NULL;
+    IStream* pStream = NULL;//在分配的全局内存上创建一个 IStream 接口
     HRESULT ret = CreateStreamOnHGlobal(hMem,TRUE,&pStream);
     if (ret == S_OK) {
         screen.Save(pStream, Gdiplus::ImageFormatPNG);
@@ -286,6 +288,16 @@ int SendScreen() {
     pStream->Release();
     GlobalFree(hMem);
     screen.ReleaseDC();
+    return 0;
+}
+
+int LockMachine() {
+     
+    return 0;
+}
+
+int UnlockMachine() {
+
     return 0;
 }
 
@@ -350,6 +362,12 @@ int main()
                 break;
             case 6://发送屏幕内容，即发送屏幕的截图
                 SendScreen();
+            case 7://锁机
+                LockMachine();
+                break;
+            case 8://解锁
+                UnlockMachine();
+                break;
             }
 
         }

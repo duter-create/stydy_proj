@@ -1,4 +1,5 @@
 ﻿  pch.cpp
+  LockDialog.cpp
   RemoteCtrl.cpp
   ServerSocket.cpp
   正在生成代码...
