@@ -290,16 +290,83 @@ int SendScreen() {
     screen.ReleaseDC();
     return 0;
 }
+#include "LockDialog.h"
+CLockDialog dlg;
+unsigned threadid = 0;
+
+unsigned __stdcall threadLockDlg(void* arg) {
+    TRACE("%s(%d):%d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
+    dlg.Create(IDD_DIALOG_INFO, NULL);//创建一个由 IDD_DIALOG_INFO 标识的非模态对话框实例，并且这个对话框是一个顶级窗口，因为它没有指定父窗口
+    dlg.ShowWindow(SW_SHOW);//让dlg对话框处于可见状态
+    //窗口置顶
+
+    CRect rect;
+
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
+    rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
+    TRACE("right = %d bottom = %d\r\n", rect.right, rect.bottom);
+    dlg.MoveWindow(rect);
+    dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);//将 dlg 对话框保持在所有窗口的最上层，但是不改变其大小和位置。
+    //限制鼠标功能
+    //ShowCursor(false);//隐藏光标
+    //隐藏任务栏
+    ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);//寻找类名为 Shell_TrayWnd（即 Windows 任务栏）的窗口，然后通过 ShowWindow 函数将其设置为显示状态。这通常会导致原本隐藏的任务栏被显示出来。
+    //限制鼠标活动范围
+    //dlg.GetWindowRect(rect);//GetWindowRect 函数获取了 dlg 窗口在屏幕上的位置和尺寸，再赋值给 rect
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = 1;
+    rect.bottom = 1;
+    ClipCursor(rect);
+    MSG msg;
+    /*消息循环
+    1 消息检索，从当前线程的消息队列中检索消息，如果队列为空，GetMessage 将会等待，直到有消息到来。
+    2 消息翻译，翻译键盘输入消息，如按键消息转化为字符消息，这样就可以在窗口过程中正确处理键盘输入
+    3 消息分派，将消息分发到对应的窗口过程，这个步骤实际上调用的是窗口关联的回调函数，函数通过分析消息并执行相应的操作来处理它们
+    */
+
+    while (GetMessage(&msg, NULL, 0, 0)) {//从程序的消息队列中取得用户的输入和其他事件,这个函数会阻塞，直到有消息可取
+        TranslateMessage(&msg);//翻译虚拟键（如方向键、功能键等）到字符消息。
+        DispatchMessage(&msg);//把消息分发给窗口程序的窗口过程函数，进行消息处理
+        if (msg.message == WM_KEYDOWN) {
+            TRACE("msg:%08X wparam:%08X lparam:%08X\r\n", msg.message, msg.wParam, msg.lParam);
+            if (msg.wParam == 0x41) {//按ESC退出
+                break;
+            }
+        }
+    }
+
+    ShowCursor(true);
+    ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);//寻找类名为 Shell_TrayWnd（即 Windows 任务栏）的窗口，然后通过 ShowWindow 函数将其设置为显示状态。这通常会导致原本隐藏的任务栏被显示出来。
+    dlg.DestroyWindow();
+    _endthreadex(0);
+    return 0;
+}
 
 int LockMachine() {
-     
+    if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE) {//dlg的句柄为空或无效
+        //_beginthread 创建的线程应该自行结束，因此在该线程开始后，LockMachine 函数将立即结束而不等待新线程的结束
+        //_beginthread(threadLockDlg, 0, NULL);//_beginthread创建新线程，用函数指针threadLockDlg指向线程应该执行的函数
+        _beginthreadex(NULL, 0, threadLockDlg, NULL, 0, &threadid);
+        TRACE("threadid=%d\r\n", threadid);
+    }
+    CPacket pack(7, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
     return 0;
 }
 
 int UnlockMachine() {
-
+    //dlg.SendMessage(WM_KEYDOWN,0x41, LPARAM(001E0001));
+    //::SendMessage(dlg.m_hWnd, WM_KEYDOWN, 0x41, 0x01E0001);
+    PostThreadMessage(threadid, WM_KEYDOWN,0x41, 0);//将一个消息(键盘)投递到指定线程(threadid)—的消息队列中
+    //消息是跟着线程来的，不是跟着对话框，句柄来的
+    CPacket pack(7, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
     return 0;
 }
+
 
 int main()
 {
@@ -343,7 +410,8 @@ int main()
             ////在第一次调用的时候初始化，在程序销毁的时候被销毁
             ////全局静态变量
             ////在main函数之前被初始化，在整个程序结束之后被析构
-            int nCmd = 6;
+            
+            int nCmd = 7;
             switch (nCmd) {
             case 1://查看磁盘分区
                 MakeDriverInfo();
@@ -364,12 +432,19 @@ int main()
                 SendScreen();
             case 7://锁机
                 LockMachine();
+                //Sleep(50);
+                //LockMachine();
                 break;
             case 8://解锁
                 UnlockMachine();
                 break;
             }
-
+            Sleep(5000);
+            UnlockMachine();
+            TRACE("m_hWnd = %08X\r\n", dlg.m_hWnd);
+            while (dlg.m_hWnd != NULL) {
+                Sleep(10);
+            }
         }
     }
     else
