@@ -132,19 +132,7 @@ public:
 		return m_instance;
 	}
 	//GetErrorInfo 函数用于将 Windows Sockets API（Winsock）返回的错误代码转换成错误消息字符串
-	std::string GetErrorInfo(int wsaErrCode) {
-		std::string ret;//存储最终错误信息
-		LPVOID lpMsgBuf = NULL;//用于指向缓冲区的指针
-		FormatMessage(//为错误消息文本分配一个缓冲区
-			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-			NULL,
-			wsaErrCode,
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			(LPTSTR)&lpMsgBuf, 0, NULL);
-		ret = (char*)lpMsgBuf;//错误信息赋值给ret
-		LocalFree(lpMsgBuf);//释放缓冲区
-		return ret;
-	}
+	std::string GetErrorInfo(int wsaErrCode);
 
 	bool InitSocket(const std::string& strIPAddress) {
 		if (m_sock == -1)return false;

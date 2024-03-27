@@ -3,4 +3,5 @@
   RemoteCtrl.cpp
   ServerSocket.cpp
   正在生成代码...
+E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\ServerSocket.h(87,1): warning C4715: “CPacket::operator=”: 不是所有的控件路径都返回值
   RemoteCtrl.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteCtrl.exe
