@@ -1,6 +1,6 @@
-﻿  LockDialog.cpp
+﻿  pch.cpp
+  LockDialog.cpp
   RemoteCtrl.cpp
   ServerSocket.cpp
   正在生成代码...
-  LINK : 没有找到 E:\ydyun\study_project\RemoteCtrl\Debug\RemoteCtrl.exe 或上一个增量链接没有生成它；正在执行完全链接
   RemoteCtrl.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteCtrl.exe
