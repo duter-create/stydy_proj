@@ -1,6 +1,6 @@
-﻿  pch.cpp
-  ClientSocket.cpp
+﻿  ClientSocket.cpp
   RemoteClient.cpp
   RemoteClientDlg.cpp
   正在生成代码...
+E:\ydyun\study_project\RemoteCtrl\RemoteClient\ClientSocket.h(88,1): warning C4715: “CPacket::operator=”: 不是所有的控件路径都返回值
   RemoteClient.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteClient.exe

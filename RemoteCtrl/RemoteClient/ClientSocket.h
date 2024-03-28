@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "framework.h"
 #include <string>
+#include <vector>
 
 #pragma pack(push)
 #pragma pack(1)//告诉编译器将每个成员变量的对齐设为1字节
@@ -135,6 +136,9 @@ public:
 	std::string GetErrorInfo(int wsaErrCode);
 
 	bool InitSocket(const std::string& strIPAddress) {
+		if (m_sock != INVALID_SOCKET)
+			CloseSocket();
+		m_sock = socket(PF_INET, SOCK_STREAM, 0);
 		if (m_sock == -1)return false;
 		sockaddr_in serv_adr;
 		memset(&serv_adr, 0, sizeof(serv_adr));
@@ -158,7 +162,7 @@ public:
 	int  DealCommand() {//处理接收到的网络命令
 		if (m_sock == -1)return -1;
 		//char buffer[1024] = "";
-		char* buffer = new char[BUFFER_SIZE];
+		char* buffer = m_buffer.data();
 		memset(buffer, 0, BUFFER_SIZE);
 		size_t index = 0;
 		while (true) {
@@ -182,6 +186,7 @@ public:
 		return (send(m_sock, pData, nSize, 0)) > 0;
 	}
 	bool Send(CPacket& pack) {
+		TRACE("m_sock = %d\r\n", m_sock);
 		if (m_sock == -1)return false;
 		return (send(m_sock, pack.Data(), pack.Size(), 0)) > 0;
 	}
@@ -200,7 +205,16 @@ public:
 		}
 		return false;
 	}
+	CPacket& GetPacket() {
+		return m_packet;
+	}
+	void CloseSocket() {
+		closesocket(m_sock);
+		m_sock = INVALID_SOCKET;
+	}
 private:
+	std::vector<char>m_buffer;
+
 	SOCKET m_sock;
 	CPacket m_packet;
 	CClientSocket& operator=(const CClientSocket& ss) {}
@@ -212,7 +226,7 @@ private:
 			MessageBox(NULL, _T("无法初始化套接字环境,请检查网络设置"), _T("初始化错误"), MB_OK | MB_ICONERROR);
 			exit(0);
 		}
-		m_sock = socket(PF_INET, SOCK_STREAM, 0);
+		m_buffer.resize(BUFFER_SIZE);
 	}
 	~CClientSocket() {
 		closesocket(m_sock);

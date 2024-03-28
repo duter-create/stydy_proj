@@ -367,6 +367,13 @@ int UnlockMachine() {
     return 0;
 }
 
+int TestConnect() {
+    CPacket pack(1981, NULL, 0);
+    bool ret = CServerSocket::getInstance()->Send(pack);
+    TRACE("Send ret = %d\r\n", ret);
+    return 0;
+}
+
 int ExcuteCommand(int nCmd) {
     int ret = 0;
     switch (nCmd) {
@@ -392,6 +399,9 @@ int ExcuteCommand(int nCmd) {
         break;
     case 8://解锁
         ret = UnlockMachine();
+        break;
+    case 1981:
+        ret = TestConnect();
         break;
     }
     return ret;
@@ -432,14 +442,16 @@ int main()
                     MessageBox(NULL, _T("无法正常接入用户，自动重试"), _T("接入用户失败！"), MB_OK | MB_ICONERROR);
                     count++;
                 }
+                TRACE("AcceptClient return true\r\n");
                 int ret = pserver->DealCommand();
-                if (ret == 0) {
-                    ret = ExcuteCommand(pserver->GetPacket().sCmd);//短链接，以控制为目标而不以文件传输下载为目标
+                TRACE("DealCommand ret %d\r\n", ret);
+                if (ret > 0) {
+                    ret = ExcuteCommand(ret);//短链接，以控制为目标而不以文件传输下载为目标
                     if (ret != 0) {
                         TRACE("执行命令失败:%d ret=%d\r\n", pserver->GetPacket().sCmd, ret);
                     }
                     pserver->CloseClient();//短链接
-                }
+                    TRACE("Command has done\r\n");                }
             }
             //静态变量
             //在第一次调用的时候初始化，在程序销毁的时候被销毁
