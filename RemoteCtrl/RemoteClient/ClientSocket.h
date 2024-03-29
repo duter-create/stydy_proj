@@ -135,7 +135,7 @@ public:
 	//GetErrorInfo 函数用于将 Windows Sockets API（Winsock）返回的错误代码转换成错误消息字符串
 	std::string GetErrorInfo(int wsaErrCode);
 
-	bool InitSocket(const std::string& strIPAddress) {
+	bool InitSocket(int nIP,int nPort) {
 		if (m_sock != INVALID_SOCKET)
 			CloseSocket();
 		m_sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -143,8 +143,10 @@ public:
 		sockaddr_in serv_adr;
 		memset(&serv_adr, 0, sizeof(serv_adr));
 		serv_adr.sin_family = AF_INET;
-		serv_adr.sin_addr.s_addr = inet_addr(strIPAddress.c_str());
-		serv_adr.sin_port = htons(9527);
+		TRACE("addr %08X nIP %08X\r\n", inet_addr("127.0.0.1"), nIP);
+		serv_adr.sin_addr.s_addr = inet_addr("127.0.0.1");
+		serv_adr.sin_addr.s_addr = htonl(nIP);
+		serv_adr.sin_port = htons(nPort);
 		if (serv_adr.sin_addr.s_addr == INADDR_NONE) {
 			AfxMessageBox("指定的IP地址，不存在");
 			return false;

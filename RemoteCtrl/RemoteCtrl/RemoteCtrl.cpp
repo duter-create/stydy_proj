@@ -43,7 +43,7 @@ int MakeDriverInfo() {//创建裆前系统可用的磁盘分区信息,1代表A�
     }
     CPacket pack(1, (BYTE*)result.c_str(), result.size());//创建CPacket实例打包用的
     Dump((BYTE*)pack.Data(), pack.Size() + 6);//输出pack的数据内容
-    //CServerSocket::getInstance()->Send(pack);
+    CServerSocket::getInstance()->Send(pack);
     return 0;
 }
 #include <stdio.h>
