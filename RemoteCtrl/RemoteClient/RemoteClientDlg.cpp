@@ -66,7 +66,7 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_TREE_DIR, m_Tree);
 }
 
-int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength)
+int CRemoteClientDlg::SendCommandPacket(int nCmd,bool bAutoClose, BYTE* pData, size_t nLength)
 {
 	UpdateData();
 	CClientSocket* pClient = CClientSocket::getInstance();
@@ -81,7 +81,9 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength)
 	TRACE("Send ret %d\r\n", ret);
 	int cmd = pClient->DealCommand();
 	TRACE("ack:%d\r\n", cmd);
-	pClient->CloseSocket();
+	if (bAutoClose) {
+			pClient->CloseSocket();
+	}
 	return cmd;
 }
 
@@ -91,6 +93,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
+	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 END_MESSAGE_MAP()
 
 
@@ -212,16 +215,80 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 	CClientSocket* pClient = CClientSocket::getInstance();
 	std::string drivers = pClient->GetPacket().strData;
 	std::string dr;
-	m_Tree.DeleteAllItems();
+	m_Tree.DeleteAllItems();//将新数据添加到树视图控件 (CTreeCtrl) 之前，先删除所有已存在的项目
 	for (size_t i = 0; i < drivers.size(); i++) {
-		if (drivers[i] == ',') {
+		if (drivers[i] == 'C' || drivers[i] == 'E') {
+			dr += drivers[i];
 			dr += ":";
-			m_Tree.InsertItem(dr.c_str(),TVI_ROOT,TVI_LAST);
+			HTREEITEM hTemp = m_Tree.InsertItem(dr.c_str(),TVI_ROOT,TVI_LAST);//TVI_ROOT: 这个参数指定了新节点的父节点,TVI_LAST: 这个参数是一个插入位置的标记
+			m_Tree.InsertItem(NULL, hTemp, TVI_LAST);
 			dr.clear();
 			continue;
 		}
-		dr += drivers[i];
+	
 	}
-	dr += ":";
-	m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+}
+
+void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
+{
+	HTREEITEM hSub = NULL;
+	do {
+		hSub = m_Tree.GetChildItem(hTree);
+		if (hSub != NULL)
+			m_Tree.DeleteItem(hSub);
+	} while (hSub != NULL);
+}
+
+CString CRemoteClientDlg::GetPath(HTREEITEM hTree) {//返回值代表从树视图控件 m_Tree 中给定项 hTree 到根的路径。
+	CString strRet, strTmp;
+	do {
+		strTmp = m_Tree.GetItemText(hTree);//获取当前节点的文本，并将其存储到 strTmp
+		strRet = strTmp + '\\' + strRet;
+		hTree = m_Tree.GetParentItem(hTree);//获取当前节点的父节点，并将父节点作为下一次循环的当前节点
+	} while (hTree != NULL);
+	return strRet;//包含了从起始节点到树的根的完整路径
+}
+
+void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	//获取鼠标当前位置，并将屏幕坐标转换为树视图控件的客户区坐标
+	CPoint ptMouse;
+	GetCursorPos(&ptMouse);
+	m_Tree.ScreenToClient(&ptMouse);
+	//确定鼠标双击的位置在树视图中对应哪个项 hTreeSelected
+	HTREEITEM hTreeSelected = m_Tree.HitTest(ptMouse, 0);
+	if (hTreeSelected == NULL)//双击事件发生在没有树视图项目的位置
+		return;
+	if (m_Tree.GetChildItem(hTreeSelected) == NULL)
+		return;
+	DeleteTreeChildrenItem(hTreeSelected);
+	CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
+	int nCmd = SendCommandPacket(2,false,(BYTE*)(LPCTSTR)strPath,strPath.GetLength());//发送一个命令数据包到服务器
+	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();//获取服务器响应数据
+	CClientSocket* pClient = CClientSocket::getInstance();//定义一个指向文件信息的指针 pInfo，并指向从客户端套接字获取的数据包中的数据
+	while (pInfo->HasNext == TRUE) {
+		TRACE("[%s] isdir %d\r\n",pInfo->szFileName,pInfo->IsDirectory);
+		if (pInfo->IsDirectory) {
+			if (CString(pInfo->szFileName) == "." || (CString(pInfo->szFileName) == "..")) {
+				int cmd = pClient->DealCommand();
+				TRACE("ack:%d\r\n", cmd);//打印接收到的响应命令
+				if (cmd < 0)
+					break;
+				pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
+				continue;
+			}
+		}
+		HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, hTreeSelected, TVI_LAST);
+		if (pInfo->IsDirectory) {
+			m_Tree.InsertItem("", hTemp, TVI_LAST);
+		}
+		int cmd = pClient->DealCommand();
+		TRACE("ack:%d\r\n", cmd);//打印接收到的响应命令
+		if (cmd < 0)
+			break;
+		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
+	} 
+
+	pClient->CloseSocket();
 }

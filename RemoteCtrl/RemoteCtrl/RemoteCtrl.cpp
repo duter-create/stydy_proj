@@ -19,6 +19,7 @@ CWinApp theApp;
 
 using namespace std;
 void Dump(BYTE* pData, size_t nSize)//将提供的字节数组（BYTE* pData）转储成一个十六进制字符串，并通过 OutputDebugStringA 输出调试信息
+//Dump 函数通常用于调试目的，它使得开发者可以在调试时轻松地以可读的十六进制格式查看内存数据。
 {
     std::string strOut;//存转的字符串
     for (size_t i = 0; i < nSize; i++) {
@@ -35,7 +36,8 @@ void Dump(BYTE* pData, size_t nSize)//将提供的字节数组（BYTE* pData）�
 int MakeDriverInfo() {//创建裆前系统可用的磁盘分区信息,1代表A盘，2代表B盘...26代表Z盘
     std::string result;//存储结果字符串
     for (int i = 1; i <= 26; i++) {
-        if (_chdrive(i) == 0) {
+        int ret = _chdrive(i);
+        if(ret == 0) {//成功改变当前活动的驱动器
             if (result.size() > 0)
                 result += ',';
             result += 'A' + i - 1;
@@ -50,19 +52,7 @@ int MakeDriverInfo() {//创建裆前系统可用的磁盘分区信息,1代表A�
 #include <io.h>
 #include <list>
 
-typedef struct file_info{
-    file_info() {
-        IsInvalid = FALSE;
-        IsDirectory = -1;
-        HasNext = TRUE;
-        memset(szFileName, 0, sizeof(szFileName));
-    }
-    BOOL IsInvalid;//是否有效
-    char szFileName[256];//文件名
-    BOOL HasNext;//是否还有后续，0没有1有
-    BOOL IsDirectory;//是否为目录，0否1是
 
-}FILEINFO,*PFILEINFO;
 
 int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息，并在发生错误的时候输出调试信息
     std::string strPath;
@@ -73,11 +63,7 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
     }
     if (_chdir(strPath.c_str()) != 0) {//更改当前工作目录为strpath指向的路径
         FILEINFO finfo;//当目录由于权限不足无法切换时
-        finfo.IsInvalid = TRUE;//文件信息无效
-        finfo.IsDirectory = TRUE;//是目录
-        finfo.HasNext = FALSE;//没有更多的信息要发送
-        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());// 将 strPath 中的字符串复制到 finfo.szFileName 中，作为无法访问的路径名
-        //lstFileInfos.pushback(finfo);
+        finfo.HasNext = FALSE;
         CPacket pack(2, (BYTE*) & finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
         OutputDebugString(_T("没有权限访问目录"));
@@ -87,13 +73,17 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
     int hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1) {
         OutputDebugString(_T("没有找到任何文件"));
+        FILEINFO finfo;
+        finfo.HasNext = FALSE;
+        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->Send(pack);
         return -3;
     }
     do {
         FILEINFO finfo;
         finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;//判断当前处理的文件项是不是目录
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
-        //lstFileInfos.push_back(finfo);
+        TRACE("%s\r\n",finfo.szFileName);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
     } while (!_findnext(hfind, &fdata));//获取下一个文件项信息

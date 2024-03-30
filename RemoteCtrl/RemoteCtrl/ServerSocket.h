@@ -5,6 +5,7 @@
 #pragma pack(push)
 #pragma pack(1)//告诉编译器将每个成员变量的对齐设为1字节
 
+void Dump(BYTE* pData, size_t nSize);
 class CPacket
 {
 public:
@@ -82,7 +83,6 @@ public:
 			strData = pack.strData;
 			sSum = pack.sSum;
 		}
-		else
 			return *this;
 	}
 	int Size() {//包数据的大小
@@ -120,6 +120,19 @@ typedef struct MouseEvent{
 	WORD nButton;//左键，右键，中键
 	POINT ptXY;//坐标
 }MOUSEEV,*PMOUSEEV;
+
+typedef struct file_info {
+	file_info() {
+		IsInvalid = FALSE;
+		IsDirectory = -1;
+		HasNext = TRUE;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	BOOL IsInvalid;//是否有效
+	BOOL IsDirectory;//是否为目录，0否1是
+	BOOL HasNext;//是否还有后续，0没有1有
+	char szFileName[256];//文件名
+}FILEINFO, * PFILEINFO;
 
 class CServerSocket
 {
@@ -197,6 +210,7 @@ public:
 	}
 	bool Send(CPacket& pack) {
 		if (m_client == -1)return false;
+		Dump((BYTE*)pack.Data(), pack.Size());
 		return (send(m_client, pack.Data(), pack.Size(), 0)) > 0;
 	}
 	bool GetFilePath(std::string& strPath) {
