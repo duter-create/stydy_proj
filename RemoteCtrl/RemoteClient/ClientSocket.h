@@ -17,7 +17,7 @@ public:
 		sCmd = nCmd;
 		if (nSize > 0) {
 			strData.resize(nSize);
-			memcpy((void*)strData.c_str(), pData, nSize);
+			memcpy((void*)strData.c_str(), pData, nSize);//将传入的数据pData通过memcpy复制到strData字符串中
 		}
 		else {
 			strData.clear();
@@ -26,7 +26,7 @@ public:
 		sSum = 0;
 		for (size_t j = 0; j < strData.size(); j++)
 		{
-			sSum += BYTE(strData[j]) & 0xFF;
+			sSum += BYTE(strData[j]) & 0xFF;//通过与0xFF进行位与操作，确保每次加入的仅仅是一个字节的值
 		}
 
 	}
@@ -37,7 +37,7 @@ public:
 		strData = pack.strData;
 		sSum = pack.sSum;
 	}
-	CPacket(const BYTE* pData, size_t& nSize) {//找包头
+	CPacket(const BYTE* pData, size_t& nSize) {//从一个BYTE数组中解析出一个数据包
 		size_t i = 0;
 		for (; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {
@@ -173,14 +173,15 @@ public:
 	}
 	
 #define BUFFER_SIZE 4096
-	int  DealCommand() {//处理接收到的网络命令
+	int  DealCommand() {//处理接收到的网络命令.返回packet中的cmd
+		//1 检查套接字有效性 2 准备缓冲区 3 接收网络数据 4 检查接受结果 5 用buffer中的数据构建数据包对象 6 返回packet数据包中的cmd字段
 		if (m_sock == -1)return -1;
 		//char buffer[1024] = "";
 		char* buffer = m_buffer.data();
 		memset(buffer, 0, BUFFER_SIZE);
 		size_t index = 0;
 		while (true) {
-			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);
+			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);//之前接收的数据不会被覆盖，并且不会超过buffer的边界
 			if (len <= 0) {
 				return -1;
 			}
@@ -246,7 +247,7 @@ private:
 		closesocket(m_sock);
 		WSACleanup();
 	}
-	BOOL InitSockEnv() {
+	BOOL InitSockEnv() {//Windows网络编程中的套接字初始化
 		WSADATA data;
 		if (WSAStartup(MAKEWORD(1, 1), &data) != 0) {
 			return FALSE;

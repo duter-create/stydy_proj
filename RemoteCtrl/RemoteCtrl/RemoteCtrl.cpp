@@ -129,6 +129,7 @@ int DownloadFile() {//下载文件，即把文件从服务端发送到客户端
         fseek(pFile, 0, SEEK_END);//用fseek函数将文件指针pfile移动到文件末尾
         data = _ftelli64(pFile);//_ftelli64：获取文件大小
         CPacket head(4, (BYTE*)&data, 8);
+        CServerSocket::getInstance()->Send(head);
         fseek(pFile, 0, SEEK_SET);//用fseek函数将文件指针pfile定位到文件起始位置
         char buffer[1024] = "";
         size_t rlen = 0;//fread返回值
@@ -237,7 +238,6 @@ int MouseEvent() {//处理鼠标事件
         return -1;
             
     }
-
     return 0;
 }
 

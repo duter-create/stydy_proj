@@ -8,7 +8,7 @@ CClientSocket* pclient = CClientSocket::getInstance();
 
 
 std::string CClientSocket::GetErrorInfo(int wsaErrCode)
-{
+{//根据 Windows Sockets API (Winsock) 的错误码获取对应的错误描述文本的。
 	std::string ret;//存储最终错误信息
 	LPVOID lpMsgBuf = NULL;//用于指向缓冲区的指针
 	FormatMessage(//为错误消息文本分配一个缓冲区
