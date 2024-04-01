@@ -236,13 +236,37 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 			m_Tree.InsertItem("", hTemp, TVI_LAST);//添加一个空文本的子项到hTemp所引用的父项下，供后续可能的内容填充
 			dr.clear();
 			continue;
-		}
-	
+		}	
 	}
 }
 
+void CRemoteClientDlg::LoadFileCurrent()
+{//从树形视图控件 m_Tree 的当前选中项目获取路径，更新当前选中目录的文件列表
+	HTREEITEM hTree = m_Tree.GetSelectedItem();
+	CString strPath = GetPath(hTree);
+	m_List.DeleteAllItems();//清空列表控件中所有的条目，准备添加新的文件信息。
+	//CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
+	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());//发送一个命令数据包到服务器
+	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();//获取服务器响应数据
+	CClientSocket* pClient = CClientSocket::getInstance();//定义一个指向文件信息的指针 pInfo，并指向从客户端套接字获取的数据包中的数据
+	while (pInfo->HasNext == TRUE) {
+		TRACE("[%s] isdir %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
+		if (!pInfo->IsDirectory) {//当前处理的是文件不是目录
+			m_List.InsertItem(0, pInfo->szFileName);
+		}
+
+		int cmd = pClient->DealCommand();
+		TRACE("ack:%d\r\n", cmd);//打印接收到的响应命令
+		if (cmd < 0)
+			break;
+		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
+	}
+
+	pClient->CloseSocket();
+}
+
 void CRemoteClientDlg::LoadFileInfo()
-{
+{//函数是基于鼠标点击的位置来确定操作的树节点，然后获取相应路径。此函数首先转换鼠标屏幕位置到树形视图坐标系中，然后使用 HitTest 方法判断鼠标点中了哪个树节点
 	//获取鼠标当前位置，并将屏幕坐标转换为树视图控件的客户区坐标
 	CPoint ptMouse;//在MFC中，CPoint 是一个表示点的类，它能存储二维坐标
 	GetCursorPos(&ptMouse);//把当前鼠标光标的屏幕坐标填充到 ptMouse 中。屏幕坐标是相对于屏幕左上角的位置
@@ -289,7 +313,7 @@ void CRemoteClientDlg::LoadFileInfo()
 }
 
 void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
-{
+{//
 	HTREEITEM hSub = NULL;
 	do {
 		hSub = m_Tree.GetChildItem(hTree);//获取父项的第一个子项
@@ -389,29 +413,33 @@ void CRemoteClientDlg::OnDownloadFile()
 		HTREEITEM hSelected = m_Tree.GetSelectedItem();//获取选中项的句柄
 		strFile = GetPath(hSelected) + strFile;//父项和该项的路径，构成完整的文件路径
 		TRACE("%s\r\n", LPCSTR(strFile));
-		int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
-		if (ret < 0) {
-			AfxMessageBox("执行下载命令失败");
-			TRACE("执行下载失败：ret = %d\r\n", ret);
-			return;
-		}
 		CClientSocket* pClient = CClientSocket::getInstance();//获取单例模式中的实例
-		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
-		if (nLength == 0) {
-			AfxMessageBox("文件长度为0或者无法读取文件");
-			return;
-		}
-
-		while (nCount < nLength) {//已接收的数据量未达到文件总数据量
-			ret = pClient->DealCommand();
+		do {
+			int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
 			if (ret < 0) {
-				AfxMessageBox("传输失败");
-				TRACE("传输失败: ret = %d\r\n", ret);
-				break;
+				AfxMessageBox("执行下载命令失败");
+				TRACE("执行下载失败：ret = %d\r\n", ret);
+				fclose(pFile);
+				pClient->CloseSocket();
+				return;
 			}
-			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
-			nCount += pClient->GetPacket().strData.size();//更新已经接收到的数据量
-		}
+			long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
+			if (nLength == 0) {
+				AfxMessageBox("文件长度为0或者无法读取文件");
+				return;
+			}
+
+			while (nCount < nLength) {//已接收的数据量未达到文件总数据量
+				ret = pClient->DealCommand();
+				if (ret < 0) {
+					AfxMessageBox("传输失败");
+					TRACE("传输失败: ret = %d\r\n", ret);
+					break;
+				}
+				fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
+				nCount += pClient->GetPacket().strData.size();//更新已经接收到的数据量
+			}
+		} while (false);
 		fclose(pFile);
 		pClient->CloseSocket();
 	}
@@ -419,11 +447,28 @@ void CRemoteClientDlg::OnDownloadFile()
 
 void CRemoteClientDlg::OnDeleteFile()
 {
-	// TODO: 在此添加命令处理程序代码
+	HTREEITEM hSelected = m_Tree.GetSelectedItem();//获取选中项的句柄
+	CString strPath = GetPath(hSelected);
+	int nSelected = m_List.GetSelectionMark();//从列表视图控件 m_List 中获取当前选中项的索引
+	CString strFile = m_List.GetItemText(nSelected, 0);//根据索引拿文本，0 表明我们想要获取当前选中项的第一列的内容
+	strFile = strPath + strFile;
+	int ret = SendCommandPacket(9, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	if (ret < 0) {
+		AfxMessageBox("删除文件命令执行失败");
+	}
+	LoadFileCurrent();
 }
 
 
 void CRemoteClientDlg::OnRunFile()
 {
-	// TODO: 在此添加命令处理程序代码
+	HTREEITEM hSelected = m_Tree.GetSelectedItem();//获取选中项的句柄
+	CString strPath = GetPath(hSelected);
+	int nSelected = m_List.GetSelectionMark();//从列表视图控件 m_List 中获取当前选中项的索引
+	CString strFile = m_List.GetItemText(nSelected, 0);//根据索引拿文本，0 表明我们想要获取当前选中项的第一列的内容
+	strFile = strPath + strFile;
+	int ret = SendCommandPacket(3, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	if (ret < 0) {
+		AfxMessageBox("打开文件命令执行失败");
+	}
 }

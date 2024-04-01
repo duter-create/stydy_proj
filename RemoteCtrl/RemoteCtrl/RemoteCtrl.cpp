@@ -364,6 +364,25 @@ int TestConnect() {
     return 0;
 }
 
+int DeleteLocalFile()
+{
+    std::string strPath;//存储文件路径
+    CServerSocket::getInstance()->GetFilePath(strPath);//文件路径赋值给strpath
+    TCHAR sPath[MAX_PATH] = _T("");//使用系统定义的 MAX_PATH（通常为 260）声明一个 TCHAR 类型的数组 sPath，用于存储转换为宽字符格式后的文件路径。
+    //_T("") 是一个宏，它用于根据项目是否支持 Unicode 而生成适当编码的字符串常量
+    //mbstowcs(sPath, strPath.c_str(), strPath.size());会乱码
+    //使用 mbstowcs 函数把 strPath 变量中存储的多字节字符字符串转换成宽字符字符串，并将结果存储到 sPath 数组。这是必要的，因为 Windows API 函数 DeleteFile 可能需要一个宽字符字符串作为参数，这取决于你的项目设置。
+    MultiByteToWideChar(
+        CP_ACP, 0, strPath.c_str(), strPath.size(), sPath,
+        sizeof(sPath) / sizeof(TCHAR));
+    DeleteFileA(strPath.c_str());
+    //调用 Windows API 函数 DeleteFile 删除名为 sPath 的文件。如果函数成功，文件将被标记为删除，并在最后一个句柄关闭时删除。
+    CPacket pack(9, NULL, 0);
+    bool ret = CServerSocket::getInstance()->Send(pack);
+    TRACE("Send ret = %d\r\n", ret);
+    return 0;
+}
+
 int ExcuteCommand(int nCmd) {
     int ret = 0;
     switch (nCmd) {
@@ -389,6 +408,9 @@ int ExcuteCommand(int nCmd) {
         break;
     case 8://解锁
         ret = UnlockMachine();
+        break;
+    case 9://删除文件
+        ret = DeleteLocalFile();
         break;
     case 1981:
         ret = TestConnect();
