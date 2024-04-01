@@ -283,6 +283,7 @@ void CRemoteClientDlg::LoadFileInfo()
 	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());//发送一个命令数据包到服务器
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();//获取服务器响应数据
 	CClientSocket* pClient = CClientSocket::getInstance();//定义一个指向文件信息的指针 pInfo，并指向从客户端套接字获取的数据包中的数据
+	int Count = 0;
 	while (pInfo->HasNext == TRUE) {
 		TRACE("[%s] isdir %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
 		if (pInfo->IsDirectory) {
@@ -299,17 +300,18 @@ void CRemoteClientDlg::LoadFileInfo()
 			m_Tree.InsertItem("", hTemp, TVI_LAST);
 		}
 		else {
-			m_List.InsertItem(0,pInfo->szFileName);
+			m_List.InsertItem(0, pInfo->szFileName);
 		}
-
+		Count++;
 		int cmd = pClient->DealCommand();
-		TRACE("ack:%d\r\n", cmd);//打印接收到的响应命令
+ 		TRACE("ack:%d\r\n", cmd);//打印接收到的响应命令
 		if (cmd < 0)
 			break;
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
 
 	pClient->CloseSocket();
+	TRACE("Client: Count = %d\r\n", Count);
 }
 
 void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
@@ -443,6 +445,7 @@ void CRemoteClientDlg::OnDownloadFile()
 		fclose(pFile);
 		pClient->CloseSocket();
 	}
+	//TODO:大文件传输需要额外的处理
 }
 
 void CRemoteClientDlg::OnDeleteFile()

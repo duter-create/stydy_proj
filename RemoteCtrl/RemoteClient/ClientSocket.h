@@ -60,6 +60,7 @@ public:
 		if (nLength > 4) {
 			strData.resize(nLength - 2 - 2);
 			memcpy((void*)strData.c_str(), pData + i, nLength - 4);
+			TRACE("%s\r\n", strData.c_str()+12);
 			i += nLength - 4;
 		}
 		sSum = *(WORD*)(pData + i);
@@ -135,6 +136,7 @@ typedef struct file_info {
 	char szFileName[256];//文件名
 }FILEINFO, * PFILEINFO;
 
+void Dump(BYTE* pData, size_t nSize);
 class CClientSocket
 {
 public:
@@ -172,24 +174,25 @@ public:
 		return true;
 	}
 	
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 204800
 	int  DealCommand() {//处理接收到的网络命令.返回packet中的cmd
 		//1 检查套接字有效性 2 准备缓冲区 3 接收网络数据 4 检查接受结果 5 用buffer中的数据构建数据包对象 6 返回packet数据包中的cmd字段
-		if (m_sock == -1)return -1;
+		if (m_sock == -1)
+			return -1;
 		//char buffer[1024] = "";
 		char* buffer = m_buffer.data();
-		memset(buffer, 0, BUFFER_SIZE);
-		size_t index = 0;
+		static size_t index = 0;//index应该是静态变量，不然每次循环都会被初始化
 		while (true) {
 			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);//之前接收的数据不会被覆盖，并且不会超过buffer的边界
-			if (len <= 0) {
+			if (len <= 0 && (index <= 0)) {//len 是 recv 函数的返回值，代表在最近的一次调用中从网络接收到的字节数;index 表示 buffer 中已经累积的数据长度。
 				return -1;
 			}
+			Dump((BYTE*)buffer, index);
 			index += len;
 			len = index;
 			m_packet = CPacket((BYTE*)buffer, len);
 			if (len > 0) {
-				memmove(buffer, buffer + len, BUFFER_SIZE - len);
+				memmove(buffer, buffer + len, index - len);
 				index -= len;
 				return m_packet.sCmd;
 			}
@@ -242,6 +245,7 @@ private:
 			exit(0);
 		}
 		m_buffer.resize(BUFFER_SIZE);
+		memset(m_buffer.data(), 0, BUFFER_SIZE);
 	}
 	~CClientSocket() {
 		closesocket(m_sock);

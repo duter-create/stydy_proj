@@ -79,6 +79,7 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
         CServerSocket::getInstance()->Send(pack);
         return -3;
     }
+    int count = 0;
     do {
         FILEINFO finfo;
         finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;//判断当前处理的文件项是不是目录
@@ -86,7 +87,9 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
         TRACE("%s\r\n",finfo.szFileName);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
+        count++;
     } while (!_findnext(hfind, &fdata));//获取下一个文件项信息
+    TRACE("server: count = %d\r\n", count);
     //发送信息到客户端 
     FILEINFO finfo;
     finfo.HasNext = FALSE;
