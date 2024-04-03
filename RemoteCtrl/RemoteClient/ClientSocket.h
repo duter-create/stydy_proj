@@ -187,7 +187,7 @@ public:
 			if (len <= 0 && (index <= 0)) {//len 是 recv 函数的返回值，代表在最近的一次调用中从网络接收到的字节数;index 表示 buffer 中已经累积的数据长度。
 				return -1;
 			}
-			Dump((BYTE*)buffer, index);
+			//Dump((BYTE*)buffer, index);
 			index += len;
 			len = index;
 			m_packet = CPacket((BYTE*)buffer, len);

@@ -2,9 +2,12 @@
 // RemoteClientDlg.h: 头文件
 //
 
+
 #pragma once
 #include "ClientSocket.h"
+#include "StatusDlg.h"
 
+#define WM_SEND_PACKET (WM_USER + 1) //第一步，自定义消息的ID
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
 {
@@ -19,8 +22,14 @@ public:
 
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
-
 private:
+	CImage m_image;//缓存
+	bool m_isFull;//缓存是否有数据，true表示有缓存，false表示没有缓存数据,初始化时设置false
+private:
+	static void threadEntryForWatchData(void* arg);//静态函数不能使用this指针
+	void threadWatchData();//成员函数可以使用this指针
+	static void threadEntryForDownFile(void* arg);
+	void threadDownFile();
 	void LoadFileCurrent();
 	void LoadFileInfo();
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
@@ -40,6 +49,7 @@ private:
 // 实现
 protected:
 	HICON m_hIcon;
+	CStatusDlg m_dlgStatus;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -64,4 +74,9 @@ public:
 	afx_msg void OnDownloadFile();
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
+	//第二步，定义自定义消息响应函数
+	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);//在类的声明中用来定义一个消息处理函数。这个函数是为了响应自定义或已定义的 Windows 消息
+	//OnSendPacket: 这是函数的名称。按照MFC的命名惯例，消息处理函数的名称通常以 "On" 开头，后跟消息的名称。
 };
+
+

@@ -103,6 +103,10 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
+	ON_MESSAGE(WM_SEND_PACKET,&CRemoteClientDlg::OnSendPacket)//第三步，在消息映射表里面注册消息
+	//将 Windows 消息（在这里是 WM_SEND_PACKET）映射到特定消息处理函数（在这里是 CRemoteClientDlg::OnSendPacket）的一种方法。这段代码通常在一个消息映射宏列表中。
+	//WM_SEND_PACKET是用户自定义的待处理的消息
+	//&CRemoteClientDlg::OnSendPacket是用来处理这个消息的函数。这个函数必须是声明在接收处理消息的类（在这里是 CRemoteClientDlg）内的成员函数。
 END_MESSAGE_MAP()
 
 
@@ -142,7 +146,9 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	m_server_address = 0x7F000001;
 	m_nPort = _T("9527");
 	UpdateData(FALSE);
-
+	m_dlgStatus.Create(IDD_DLG_STATUS,this);
+	m_dlgStatus.FlashWindow(SW_HIDE);
+	m_isFull = false;
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -238,6 +244,110 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 			continue;
 		}	
 	}
+}
+
+void CRemoteClientDlg::threadEntryForWatchData(void* arg)
+{//开线程处理数据
+	CRemoteClientDlg* thiz = (CRemoteClientDlg*)arg;
+	thiz->threadWatchData();
+	_endthread();
+}
+
+void CRemoteClientDlg::threadWatchData()
+{//处理数据的线程实现
+	CClientSocket* pClient = NULL;
+	do {
+		CClientSocket* pClient = CClientSocket::getInstance();
+
+	} while (pClient == NULL);
+	for (;;) {//等价while(true)
+		CPacket pack(6, NULL, 0);
+		bool ret = pClient->Send(pack);
+		if (ret) {
+			int cmd = pClient->DealCommand();//拿数据
+			if (cmd == 6) {
+				if (m_isFull == false) {
+					BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
+					//TODO:存入CImage
+					m_isFull = true;
+				}
+			}
+		}
+		else {
+			Sleep(1);//预防网络突然断掉，上面的循环把cpu拉满，留个空闲让cpu处理其他程序
+		}
+	}
+}
+
+void CRemoteClientDlg::threadEntryForDownFile(void* arg)
+{
+	CRemoteClientDlg* thiz = (CRemoteClientDlg*)arg;
+	thiz->threadDownFile();
+	_endthread();
+}
+
+void CRemoteClientDlg::threadDownFile()
+{
+	int nListSelected = m_List.GetSelectionMark();//从列表视图控件 m_List 中获取当前选中项的索引
+	CString strFile = m_List.GetItemText(nListSelected, 0);//用刚刚拿到的索引来拿选中项的文件名
+
+	long long nCount = 0;
+	//CFileDialog 是 MFC (Microsoft Foundation Classes) 库中用于创建文件对话框的类
+	//FALSE 参数用于指定对话框的模式，这里 FALSE 表示对话框是“保存文件”模式。如果是 TRUE，则表示为“打开文件”模式。
+	//"*" 参数是默认的文件扩展名。在这种情况下，它被设置为一个通配符，这意味着所有文件扩展名都可以。
+	//m_List.GetItemText(nListSelected, 0) 获得列表控件中当前被选中的项的文本，通常表示文件名，将用作对话框显示的默认文件名。
+	//OFN_HIDEREADONLY 表示隐藏只读选项。
+	//OFN_OVERWRITEPROMPT 表示在用户选择要保存到一个已经存在的文件时，提示用户确认是否覆盖原文件。
+
+	CFileDialog dlg(FALSE, "*",
+		strFile,
+		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+		NULL, this);
+	//以模态方式显示对话框。如果用户点击“保存”按钮（通常响应为 IDOK）
+	// 则 DoModal 方法会返回 IDOK，代码将进入到 if 语句块内执行
+	if (dlg.DoModal() == IDOK) {
+		//开个文件把接收到的文件写到本地
+		FILE* pFile = fopen(dlg.GetPathName(), "wb+");//以二进制模式打开文件，允许读写操作
+		if (pFile == NULL) {
+			AfxMessageBox(_T("本地没有权限保存该文件，或者文件无法创建"));
+			m_dlgStatus.ShowWindow(SW_HIDE);//将 m_dlgStatus 对话框隐藏起来
+			EndWaitCursor();
+			return;
+		}
+		HTREEITEM hSelected = m_Tree.GetSelectedItem();//获取选中项的句柄
+		strFile = GetPath(hSelected) + strFile;//父项和该项的路径，构成完整的文件路径
+		TRACE("%s\r\n", LPCSTR(strFile));
+		CClientSocket* pClient = CClientSocket::getInstance();//获取单例模式中的实例
+		do {
+			//int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
+			int ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);//SendMessage 函数是一个Windows API，用于发送一个消息到某个窗口的消息队列，
+			if (ret < 0) {
+				AfxMessageBox("执行下载命令失败");
+				TRACE("执行下载失败：ret = %d\r\n", ret);
+				break;
+			}
+			long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
+			if (nLength == 0) {
+				AfxMessageBox("文件长度为0或者无法读取文件");
+				break;
+			}
+			while (nCount < nLength) {//已接收的数据量未达到文件总数据量
+				ret = pClient->DealCommand();
+				if (ret < 0) {
+					AfxMessageBox("传输失败");
+					TRACE("传输失败: ret = %d\r\n", ret);
+					break;
+				}
+				fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
+				nCount += pClient->GetPacket().strData.size();//更新已经接收到的数据量
+			}
+		} while (false);
+		fclose(pFile);
+		pClient->CloseSocket();
+	}
+	m_dlgStatus.ShowWindow(SW_HIDE);//将 m_dlgStatus 对话框隐藏起来
+	EndWaitCursor();
+	MessageBox(_T("下载完成"), _T("完成"));
 }
 
 void CRemoteClientDlg::LoadFileCurrent()
@@ -348,7 +458,6 @@ void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 	LoadFileInfo();
 }
 
-
 void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)//右键单击
 {//点击列表视图 m_List 控件时弹出一个上下文菜单，使用户能够对选中的列表项进行操作
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
@@ -388,63 +497,16 @@ void CRemoteClientDlg::OnEnChangeEditPort()
 
 void CRemoteClientDlg::OnDownloadFile()
 {
-	int nListSelected = m_List.GetSelectionMark();//从列表视图控件 m_List 中获取当前选中项的索引
-	CString strFile = m_List.GetItemText(nListSelected, 0);//用刚刚拿到的索引来拿选中项的文件名
-	
-	long long nCount = 0;
-	//CFileDialog 是 MFC (Microsoft Foundation Classes) 库中用于创建文件对话框的类
-	//FALSE 参数用于指定对话框的模式，这里 FALSE 表示对话框是“保存文件”模式。如果是 TRUE，则表示为“打开文件”模式。
-	//"*" 参数是默认的文件扩展名。在这种情况下，它被设置为一个通配符，这意味着所有文件扩展名都可以。
-	//m_List.GetItemText(nListSelected, 0) 获得列表控件中当前被选中的项的文本，通常表示文件名，将用作对话框显示的默认文件名。
-	//OFN_HIDEREADONLY 表示隐藏只读选项。
-	//OFN_OVERWRITEPROMPT 表示在用户选择要保存到一个已经存在的文件时，提示用户确认是否覆盖原文件。
-
-	CFileDialog dlg(FALSE,"*",
-		strFile, 
-		OFN_HIDEREADONLY|OFN_OVERWRITEPROMPT,
-		NULL,this);
-	//以模态方式显示对话框。如果用户点击“保存”按钮（通常响应为 IDOK）
-	// 则 DoModal 方法会返回 IDOK，代码将进入到 if 语句块内执行
-	if (dlg.DoModal() == IDOK) {
-		//开个文件把接收到的文件写到本地
-		FILE* pFile = fopen(dlg.GetPathName(), "wb+");//以二进制模式打开文件，允许读写操作
-		if (pFile == NULL) {
-			AfxMessageBox(_T("本地没有权限保存该文件，或者文件无法创建"));
-			return;
-		}
-		HTREEITEM hSelected = m_Tree.GetSelectedItem();//获取选中项的句柄
-		strFile = GetPath(hSelected) + strFile;//父项和该项的路径，构成完整的文件路径
-		TRACE("%s\r\n", LPCSTR(strFile));
-		CClientSocket* pClient = CClientSocket::getInstance();//获取单例模式中的实例
-		do {
-			int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
-			if (ret < 0) {
-				AfxMessageBox("执行下载命令失败");
-				TRACE("执行下载失败：ret = %d\r\n", ret);
-				fclose(pFile);
-				pClient->CloseSocket();
-				return;
-			}
-			long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
-			if (nLength == 0) {
-				AfxMessageBox("文件长度为0或者无法读取文件");
-				return;
-			}
-
-			while (nCount < nLength) {//已接收的数据量未达到文件总数据量
-				ret = pClient->DealCommand();
-				if (ret < 0) {
-					AfxMessageBox("传输失败");
-					TRACE("传输失败: ret = %d\r\n", ret);
-					break;
-				}
-				fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
-				nCount += pClient->GetPacket().strData.size();//更新已经接收到的数据量
-			}
-		} while (false);
-		fclose(pFile);
-		pClient->CloseSocket();
-	}
+	////////添加线程函数
+	_beginthread(CRemoteClientDlg::threadEntryForDownFile, 0, this);
+	//1 作为线程入口点，这个函数将在新线程中执行
+	//2 0是初始线程堆栈大小的参数。数值0表示使用默认的大小
+	//3 传递给线程的参数。在这种情况下，this 指针指向当前正在执行 _beginthread 调用的类实例 CRemoteClientDlg 对象。
+	BeginWaitCursor();//沙漏光标
+	m_dlgStatus.m_info.SetWindowText(_T("命令正在执行中"));//SetWindowText 方法用于设置 m_info 控件的文本内容。在这里，它被设置为显示 "命令正在执行中"
+	m_dlgStatus.ShowWindow(SW_SHOW);
+	m_dlgStatus.CenterWindow(this);
+	m_dlgStatus.SetActiveWindow();//使 m_dlgStatus 对话框成为当前活动窗口,将对话框带到屏幕的最前端
 	//TODO:大文件传输需要额外的处理
 }
 
@@ -474,4 +536,14 @@ void CRemoteClientDlg::OnRunFile()
 	if (ret < 0) {
 		AfxMessageBox("打开文件命令执行失败");
 	}
+}
+
+LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)//第四步：实现消息响应函数
+{//类 CRemoteClientDlg 中的一个消息处理函数 OnSendPacket 的定义。
+//函数 OnSendPacket 响应自定义的 WM_SEND_PACKET 消息，并执行发送命令到服务器的操作。
+	CString strFile = (LPCSTR)lParam;
+	//int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
+	//只接收两个函数的处理
+	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
+	return ret;
 }
