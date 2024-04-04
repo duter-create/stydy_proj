@@ -261,10 +261,10 @@ int SendScreen() {
     IStream* pStream = NULL;//在分配的全局内存上创建一个 IStream 接口
     HRESULT ret = CreateStreamOnHGlobal(hMem,TRUE,&pStream);
     if (ret == S_OK) {
-        screen.Save(pStream, Gdiplus::ImageFormatPNG);
+        screen.Save(pStream, Gdiplus::ImageFormatPNG);//将一个屏幕截图保存为PNG格式的图片到一个流对象中
         LARGE_INTEGER bg = { 0 };
-        pStream->Seek(bg, STREAM_SEEK_SET, NULL);
-        PBYTE pData = (BYTE*)GlobalLock(hMem);
+        pStream->Seek(bg, STREAM_SEEK_SET, NULL);//重置流的内部位置指针到流的开始处
+        PBYTE pData = (BYTE*)GlobalLock(hMem);//对一个全局内存对象进行锁定，并获取到指向内存对象数据的指针。
         SIZE_T nSize = GlobalSize(hMem);
         CPacket pack(6, pData,nSize);
         CServerSocket::getInstance()->Send(pack);

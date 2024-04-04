@@ -11,39 +11,9 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+#include "WatchDialog.h"
 
 
-// 用于应用程序“关于”菜单项的 CAboutDlg 对话框
-
-class CAboutDlg : public CDialogEx
-{
-public:
-	CAboutDlg();
-
-// 对话框数据
-#ifdef AFX_DESIGN_TIME
-	enum { IDD = IDD_ABOUTBOX };
-#endif
-
-	protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
-
-// 实现
-protected:
-	DECLARE_MESSAGE_MAP()
-};
-
-CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
-{
-}
-
-void CAboutDlg::DoDataExchange(CDataExchange* pDX)
-{
-	CDialogEx::DoDataExchange(pDX);
-}
-
-BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
-END_MESSAGE_MAP()
 
 
 // CRemoteClientDlg 对话框
@@ -107,6 +77,8 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	//将 Windows 消息（在这里是 WM_SEND_PACKET）映射到特定消息处理函数（在这里是 CRemoteClientDlg::OnSendPacket）的一种方法。这段代码通常在一个消息映射宏列表中。
 	//WM_SEND_PACKET是用户自定义的待处理的消息
 	//&CRemoteClientDlg::OnSendPacket是用来处理这个消息的函数。这个函数必须是声明在接收处理消息的类（在这里是 CRemoteClientDlg）内的成员函数。
+	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
+	ON_WM_TIMER()
 END_MESSAGE_MAP()
 
 
@@ -156,8 +128,7 @@ void CRemoteClientDlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	if ((nID & 0xFFF0) == IDM_ABOUTBOX)
 	{
-		CAboutDlg dlgAbout;
-		dlgAbout.DoModal();
+
 	}
 	else
 	{
@@ -265,11 +236,26 @@ void CRemoteClientDlg::threadWatchData()
 		bool ret = pClient->Send(pack);
 		if (ret) {
 			int cmd = pClient->DealCommand();//拿数据
-			if (cmd == 6) {
-				if (m_isFull == false) {
+			if (cmd == 6) {//发送屏幕的截图
+				if (m_isFull == false) {//更新数据到缓存
 					BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
-					//TODO:存入CImage
-					m_isFull = true;
+					HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+					if (hMem == NULL) {
+						TRACE("内存不足了");
+						Sleep(1);
+						continue;
+					}
+					IStream* pStream = NULL;
+					HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+					if (hRet == S_OK) {
+						ULONG length = 0;
+						pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
+						LARGE_INTEGER bg = { 0 };
+						pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+						m_image.Load(pStream);
+						m_isFull = true;
+
+					}
 				}
 			}
 		}
@@ -546,4 +532,35 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)//第四步�
 	//只接收两个函数的处理
 	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
 	return ret;
+}
+
+/*
+void CRemoteClientDlg::OnBnClickedBtnStartWatch()
+{
+	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
+	GetDlgItem(IDC_BTN_START_WATCH)->EnableWindow(FALSE);//窗口禁用,开启监视窗口的时候再打开
+	CWatchDialog dlg;
+	dlg.DoModal();
+}
+*/
+
+
+void CRemoteClientDlg::OnBnClickedBtnStartWatch()
+{
+	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
+	CWatchDialog dlg(this);//创建了对话框CWatchDialog的一个实例dlg
+	//this作为父窗口的指针传入，可以直接访问CRemoteClientDlg的成员变量或函数
+	//父窗口关闭时，子窗口也都会关闭并且回收资源
+	dlg.DoModal();//显示对话框，并进入一个模态循环，阻塞调用线程直到对话框被关闭。
+	//模态和非模态对话框的主要区别在于模态对话框在用户与其交互时会禁用其它窗口，防止用户在没有处理完当前对话框情况下进行其它操作。
+	// 而非模态对话框允许用户在对话框打开的时候与应用程序的其它窗口交互。
+}
+
+
+void CRemoteClientDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+
+
+	CDialogEx::OnTimer(nIDEvent);
 }
