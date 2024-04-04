@@ -406,6 +406,7 @@ int ExcuteCommand(int nCmd) {
         break;
     case 6://发送屏幕内容，即发送屏幕的截图
         ret = SendScreen();
+        break;
     case 7://锁机
         ret = LockMachine();
         break;

@@ -14,11 +14,39 @@
 #include "WatchDialog.h"
 
 
+// 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
+class CAboutDlg : public CDialogEx
+{
+public:
+	CAboutDlg();
+
+	// 对话框数据
+#ifdef AFX_DESIGN_TIME
+	enum { IDD = IDD_ABOUTBOX };
+#endif
+
+protected:
+	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
+
+	// 实现
+protected:
+	DECLARE_MESSAGE_MAP()
+};
+
+CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
+{
+}
+
+void CAboutDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialogEx::DoDataExchange(pDX);
+}
+
+BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
+END_MESSAGE_MAP()
 
 // CRemoteClientDlg 对话框
-
-
 
 CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_REMOTECLIENT_DIALOG, pParent)
@@ -226,44 +254,50 @@ void CRemoteClientDlg::threadEntryForWatchData(void* arg)
 
 void CRemoteClientDlg::threadWatchData()
 {//处理数据的线程实现
+	Sleep(50);
 	CClientSocket* pClient = NULL;
+
 	do {
-		CClientSocket* pClient = CClientSocket::getInstance();
+		//CClientSocket* pClient = CClientSocket::getInstance();//循环内部重新声明了一个局部变量pClient，这实际上是个错误。新声明的pClient会遮蔽函数开头声明的pClient，导致循环外部的pClient始终是NULL，循环永远不会退出。
+		pClient = CClientSocket::getInstance();
 
 	} while (pClient == NULL);
+	ULONGLONG tick = GetTickCount64();
 	for (;;) {//等价while(true)
-		CPacket pack(6, NULL, 0);
-		bool ret = pClient->Send(pack);
-		if (ret) {
-			int cmd = pClient->DealCommand();//拿数据
-			if (cmd == 6) {//发送屏幕的截图
-				if (m_isFull == false) {//更新数据到缓存
-					BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
-					HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
-					if (hMem == NULL) {
-						TRACE("内存不足了");
-						Sleep(1);
-						continue;
-					}
-					IStream* pStream = NULL;
-					HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
-					if (hRet == S_OK) {
-						ULONG length = 0;
-						pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
-						LARGE_INTEGER bg = { 0 };
-						pStream->Seek(bg, STREAM_SEEK_SET, NULL);
-						m_image.Load(pStream);
-						m_isFull = true;
+		if (m_isFull == false) {//更新数据到缓存
+			//CPacket pack(6, NULL, 0);
+			//bool ret = pClient->Send(pack);
+		int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1);//SendMessage 函数是一个Windows API，用于发送一个消息到某个窗口的消息队列，
+		if (ret == 6) {
+			//int cmd = pClient->DealCommand();//拿数据,已经拿了，这里不用再拿了
+			//if (cmd == 6) {//发送屏幕的截图
 
-					}
-				}
+			BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
+			HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+			if (hMem == NULL) {
+				TRACE("内存不足了");
+				Sleep(1);
+				continue;
+			}
+			IStream* pStream = NULL;
+			HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+			if (hRet == S_OK) {
+				ULONG length = 0;
+				pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
+				LARGE_INTEGER bg = { 0 };
+				pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+				m_image.Load(pStream);
+				m_isFull = true;
 			}
 		}
 		else {
-			Sleep(1);//预防网络突然断掉，上面的循环把cpu拉满，留个空闲让cpu处理其他程序
+			Sleep(1);
 		}
 	}
+	else Sleep(1);//预防网络突然断掉，上面的循环把cpu拉满，留个空闲让cpu处理其他程序
+	}
 }
+
 
 void CRemoteClientDlg::threadEntryForDownFile(void* arg)
 {
@@ -306,7 +340,7 @@ void CRemoteClientDlg::threadDownFile()
 		CClientSocket* pClient = CClientSocket::getInstance();//获取单例模式中的实例
 		do {
 			//int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
-			int ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);//SendMessage 函数是一个Windows API，用于发送一个消息到某个窗口的消息队列，
+			int ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCSTR)strFile);//SendMessage 函数是一个Windows API，用于发送一个消息到某个窗口的消息队列，左移一位为了移动到指定位置上
 			if (ret < 0) {
 				AfxMessageBox("执行下载命令失败");
 				TRACE("执行下载失败：ret = %d\r\n", ret);
@@ -527,10 +561,25 @@ void CRemoteClientDlg::OnRunFile()
 LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)//第四步：实现消息响应函数
 {//类 CRemoteClientDlg 中的一个消息处理函数 OnSendPacket 的定义。
 //函数 OnSendPacket 响应自定义的 WM_SEND_PACKET 消息，并执行发送命令到服务器的操作。
-	CString strFile = (LPCSTR)lParam;
-	//int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
-	//只接收两个函数的处理
-	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
+	int ret = 0;
+	int cmd = wParam >> 1;
+	switch (cmd) {
+	case 4:
+	{
+		CString strFile = (LPCSTR)lParam;
+		//int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
+		//只接收两个函数的处理
+		ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
+	}
+	break;
+	case 6:
+	{
+		ret = SendCommandPacket(cmd, wParam & 1);//发送下载命令到服务器
+	}
+	break;
+	default:
+		ret = -1;
+	}
 	return ret;
 }
 
@@ -547,10 +596,11 @@ void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
-	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
 	CWatchDialog dlg(this);//创建了对话框CWatchDialog的一个实例dlg
 	//this作为父窗口的指针传入，可以直接访问CRemoteClientDlg的成员变量或函数
 	//父窗口关闭时，子窗口也都会关闭并且回收资源
+	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
+	
 	dlg.DoModal();//显示对话框，并进入一个模态循环，阻塞调用线程直到对话框被关闭。
 	//模态和非模态对话框的主要区别在于模态对话框在用户与其交互时会禁用其它窗口，防止用户在没有处理完当前对话框情况下进行其它操作。
 	// 而非模态对话框允许用户在对话框打开的时候与应用程序的其它窗口交互。

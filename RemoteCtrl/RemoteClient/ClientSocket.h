@@ -174,7 +174,7 @@ public:
 		return true;
 	}
 	
-#define BUFFER_SIZE 204800
+#define BUFFER_SIZE 4096000
 	int  DealCommand() {//处理接收到的网络命令.返回packet中的cmd
 		//1 检查套接字有效性 2 准备缓冲区 3 接收网络数据 4 检查接受结果 5 用buffer中的数据构建数据包对象 6 返回packet数据包中的cmd字段
 		if (m_sock == -1)
