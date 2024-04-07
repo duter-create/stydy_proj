@@ -187,6 +187,7 @@ int MouseEvent() {//处理鼠标事件
         default:
             break;
         }
+        TRACE("mouse event : %08X x %d y %d \r\n", nFlags,mouse.ptXY.x,mouse.ptXY.y);
         switch (nFlags)
         {
         case 0x21://左键双击
@@ -253,7 +254,7 @@ int SendScreen() {
     int nWidth = GetDeviceCaps(hScreen, HORZRES);
     int nHeight = GetDeviceCaps(hScreen, VERTRES);
     screen.Create(nWidth, nHeight, nBitPerPixel);//用上面的参数来创建screen图片对象
-    BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY); //使用 BitBlt 函数来将屏幕的图像复制到 screen 对象中
+    BitBlt(screen.GetDC(), 0, 0, 2560, 1440, hScreen, 0, 0, SRCCOPY); //使用 BitBlt 函数来将屏幕的图像复制到 screen 对象中
     ReleaseDC(NULL, hScreen);
     HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);//分配全局内存对象，准备使用后续内存流
     if (hMem == NULL)//全局内存分配失败
