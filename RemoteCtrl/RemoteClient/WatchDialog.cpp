@@ -14,9 +14,10 @@ IMPLEMENT_DYNAMIC(CWatchDialog, CDialog)
 CWatchDialog::CWatchDialog(CWnd* pParent /*=nullptr*/)
 	: CDialog(IDD_DLG_WATCH, pParent)
 {
-	int m_nObjWidth = -1;;//n表示整数，后面是驼峰命名法
-	int m_nObjHeight = -1;
-
+	m_nObjWidth = -1;//n表示整数，后面是驼峰命名法
+	m_nObjHeight = -1;
+	//注意在构造函数中初始化这些成员变量时，是在给它们赋值而不是声明它们
+	//如果你尝试在构造函数内使用int m_nObjWidth = -1;这种风格，编译器会认为你在尝试重新声明一个局部变量，而不是初始化类的成员变量。这会导致编译错误，
 }
 
 CWatchDialog::~CWatchDialog()
@@ -46,7 +47,7 @@ END_MESSAGE_MAP()
 // CWatchDialog 消息处理程序
 
 
-CPoint CWatchDialog::UserPoint2RemoteScreenPoint(CPoint& point,bool isScreen)
+CPoint CWatchDialog::UserPoint2RemoteScreenPoint(CPoint& point, bool isScreen)
 {
 	//(800*450)
 	//CPoint cur = point;
@@ -63,11 +64,12 @@ CPoint CWatchDialog::UserPoint2RemoteScreenPoint(CPoint& point,bool isScreen)
 	TRACE("x=%d y=%d\r\n", clientRect.Width(), clientRect.Height());
 	//远程端坐标
 	int width = m_nObjWidth, height = m_nObjHeight;
+	TRACE("x=%d y=%d\r\n", width,height);
 	//坐标转换
 	int x = point.x * width / width0;
 	int y = point.y * height / height0;
-
-	return CPoint(x,y);
+	TRACE("x=%d y=%d\r\n",x, y);
+	return CPoint(x, y);
 }
 
 BOOL CWatchDialog::OnInitDialog()
@@ -264,5 +266,5 @@ void CWatchDialog::OnOK()
 {
 	// TODO: 在此添加专用代码和/或调用基类
 
-	CDialog::OnOK();
+	//CDialog::OnOK();
 }

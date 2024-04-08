@@ -143,8 +143,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 
 	// TODO: 在此添加额外的初始化代码
 	UpdateData();
-	m_server_address = 0x7F000001;//127.0.0.1
-	//m_server_address = 0xC0A83B83;//192.168.59.131
+	//m_server_address = 0x7F000001;//127.0.0.1
+	m_server_address = 0xC0A83B84;//192.168.59.132
 	m_nPort = _T("9527");
 	UpdateData(FALSE);
 	m_dlgStatus.Create(IDD_DLG_STATUS,this);
