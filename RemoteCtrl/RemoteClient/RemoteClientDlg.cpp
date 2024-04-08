@@ -143,7 +143,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 
 	// TODO: 在此添加额外的初始化代码
 	UpdateData();
-	m_server_address = 0x7F000001;
+	m_server_address = 0x7F000001;//127.0.0.1
+	//m_server_address = 0xC0A83B83;//192.168.59.131
 	m_nPort = _T("9527");
 	UpdateData(FALSE);
 	m_dlgStatus.Create(IDD_DLG_STATUS,this);
@@ -254,6 +255,7 @@ void CRemoteClientDlg::threadEntryForWatchData(void* arg)
 
 void CRemoteClientDlg::threadWatchData()
 {//处理数据的线程实现
+//	可能存在异步问题，导致程序崩溃
 	Sleep(50);
 	CClientSocket* pClient = NULL;
 
@@ -263,7 +265,7 @@ void CRemoteClientDlg::threadWatchData()
 
 	} while (pClient == NULL);
 	ULONGLONG tick = GetTickCount64();
-	for (;;) {//等价while(true)
+	while(!m_isClosed) {//
 		if (m_isFull == false) {//更新数据到缓存
 			//CPacket pack(6, NULL, 0);
 			//bool ret = pClient->Send(pack);
@@ -286,6 +288,8 @@ void CRemoteClientDlg::threadWatchData()
 				pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
 				LARGE_INTEGER bg = { 0 };
 				pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+				if((HBITMAP)m_image != NULL)
+					m_image.Destroy();
 				m_image.Load(pStream);
 				m_isFull = true;
 			}
@@ -600,14 +604,17 @@ void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
+	m_isClosed = false;//对话框开启状态
 	CWatchDialog dlg(this);//创建了对话框CWatchDialog的一个实例dlg
 	//this作为父窗口的指针传入，可以直接访问CRemoteClientDlg的成员变量或函数
 	//父窗口关闭时，子窗口也都会关闭并且回收资源
-	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
+	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
 	
 	dlg.DoModal();//显示对话框，并进入一个模态循环，阻塞调用线程直到对话框被关闭。
 	//模态和非模态对话框的主要区别在于模态对话框在用户与其交互时会禁用其它窗口，防止用户在没有处理完当前对话框情况下进行其它操作。
 	// 而非模态对话框允许用户在对话框打开的时候与应用程序的其它窗口交互。
+	m_isClosed = true;//对话框关闭
+	WaitForSingleObject(hThread, 500);//等待之前创建的线程停止（500ms）
 }
 
 
