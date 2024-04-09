@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<XPD:PROJECT xmlns:XPD="http://www.staruml.com" version="1">
+<XPD:HEADER>
+<XPD:SUBUNITS>
+</XPD:SUBUNITS>
+<XPD:PROFILES>
+</XPD:PROFILES>
+</XPD:HEADER>
+<XPD:BODY>
+<XPD:OBJ name="DocumentElement" type="UMLProject" guid="xd7GrtXxl0aLb//v+mvBzwAA">
+<XPD:ATTR name="Documentation" type="string">1 该系统包括两个部分：
+a 远程控制服务器
+b 请求控制客户端
+对于远程控制服务器，有下列功能
+1. 文件操作（查询、删除、下载、运行）
+2. 屏幕操作（监视、鼠标、锁定、解锁）
+对于请求控制客户端，有下列功能：
+1. 发起控制请求（文件操作、屏幕操作）
+2. 显示控制结果（应答反馈、监视画面显示）
+3. 与远程桌面进行交互（鼠标、加锁/解锁）</XPD:ATTR>
+<XPD:ATTR name="Title" type="string">远程控制系统设计</XPD:ATTR>
+<XPD:ATTR name="Author" type="string">zxqin</XPD:ATTR>
+<XPD:ATTR name="Company" type="string">DUT</XPD:ATTR>
+<XPD:ATTR name="#OwnedElements" type="integer">2</XPD:ATTR>
+<XPD:OBJ name="OwnedElements[0]" type="UMLPackage" guid="w9RZNds8O0K0RPKMJmXzJgAA">
+<XPD:ATTR name="Name" type="string">RemoteCtrl</XPD:ATTR>
+<XPD:REF name="Namespace">xd7GrtXxl0aLb//v+mvBzwAA</XPD:REF>
+<XPD:ATTR name="#OwnedDiagrams" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="OwnedDiagrams[0]" type="UMLClassDiagram" guid="OiSk3OAUWUmK2hga+2k93AAA">
+<XPD:ATTR name="Name" type="string">RemoteCtrl</XPD:ATTR>
+<XPD:REF name="DiagramOwner">w9RZNds8O0K0RPKMJmXzJgAA</XPD:REF>
+<XPD:OBJ name="DiagramView" type="UMLClassDiagramView" guid="CP93Q2zPeUCpGbkpT9qygwAA">
+<XPD:REF name="Diagram">OiSk3OAUWUmK2hga+2k93AAA</XPD:REF>
+<XPD:ATTR name="#OwnedViews" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="OwnedViews[0]" type="UMLClassView" guid="XGsrp1DQEkib7d3aEvlE9wAA">
+<XPD:ATTR name="LineColor" type="string">clMaroon</XPD:ATTR>
+<XPD:ATTR name="FillColor" type="string">$00B9FFFF</XPD:ATTR>
+<XPD:ATTR name="Left" type="integer">106</XPD:ATTR>
+<XPD:ATTR name="Top" type="integer">85</XPD:ATTR>
+<XPD:ATTR name="Width" type="integer">80</XPD:ATTR>
+<XPD:ATTR name="Height" type="integer">69</XPD:ATTR>
+<XPD:REF name="Model">fy/2wpY630+hBsjL8wW/fgAA</XPD:REF>
+<XPD:OBJ name="NameCompartment" type="UMLNameCompartmentView" guid="A4A+NXnQhU23qBf5tGvn6wAA">
+<XPD:OBJ name="NameLabel" type="LabelView" guid="jDjqhIJfrkWrGOuEyVFo9gAA">
+<XPD:ATTR name="FontStyle" type="integer">1</XPD:ATTR>
+<XPD:ATTR name="Text" type="string">global</XPD:ATTR>
+</XPD:OBJ>
+<XPD:OBJ name="StereotypeLabel" type="LabelView" guid="oORKI/7jf0mgj1c2HVUQNwAA">
+<XPD:ATTR name="Visible" type="boolean">False</XPD:ATTR>
+</XPD:OBJ>
+<XPD:OBJ name="PropertyLabel" type="LabelView" guid="LWKE6OwWxEWHbJZAW/ddfQAA">
+<XPD:ATTR name="Visible" type="boolean">False</XPD:ATTR>
+</XPD:OBJ>
+</XPD:OBJ>
+<XPD:OBJ name="AttributeCompartment" type="UMLAttributeCompartmentView" guid="plK2OiHovkK3WM+q5PysbwAA">
+<XPD:REF name="Model">fy/2wpY630+hBsjL8wW/fgAA</XPD:REF>
+</XPD:OBJ>
+<XPD:OBJ name="OperationCompartment" type="UMLOperationCompartmentView" guid="UHZekhQC1kGUnDc7WOcxYgAA">
+<XPD:REF name="Model">fy/2wpY630+hBsjL8wW/fgAA</XPD:REF>
+</XPD:OBJ>
+<XPD:OBJ name="TemplateParameterCompartment" type="UMLTemplateParameterCompartmentView" guid="wE/WBFBOs0CqC/oQ3hTRhwAA">
+<XPD:ATTR name="Visible" type="boolean">False</XPD:ATTR>
+<XPD:REF name="Model">fy/2wpY630+hBsjL8wW/fgAA</XPD:REF>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:OBJ>
+<XPD:ATTR name="#OwnedElements" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="OwnedElements[0]" type="UMLClass" guid="fy/2wpY630+hBsjL8wW/fgAA">
+<XPD:ATTR name="Name" type="string">global</XPD:ATTR>
+<XPD:ATTR name="Documentation" type="string">此类中的函数/变量，均是全局函数/变量，全部为公有变量</XPD:ATTR>
+<XPD:REF name="Namespace">w9RZNds8O0K0RPKMJmXzJgAA</XPD:REF>
+<XPD:ATTR name="#Views" type="integer">4</XPD:ATTR>
+<XPD:REF name="Views[0]">XGsrp1DQEkib7d3aEvlE9wAA</XPD:REF>
+<XPD:REF name="Views[1]">plK2OiHovkK3WM+q5PysbwAA</XPD:REF>
+<XPD:REF name="Views[2]">UHZekhQC1kGUnDc7WOcxYgAA</XPD:REF>
+<XPD:REF name="Views[3]">wE/WBFBOs0CqC/oQ3hTRhwAA</XPD:REF>
+<XPD:ATTR name="#Operations" type="integer">2</XPD:ATTR>
+<XPD:OBJ name="Operations[0]" type="UMLOperation" guid="fZM4p0yP00qb7NaEFnWIeAAA">
+<XPD:ATTR name="Name" type="string">main</XPD:ATTR>
+<XPD:REF name="Owner">fy/2wpY630+hBsjL8wW/fgAA</XPD:REF>
+<XPD:ATTR name="#Parameters" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="Parameters[0]" type="UMLParameter" guid="UvfHhPO5ZEe9CeHoP/szwAAA">
+<XPD:ATTR name="DirectionKind" type="UMLParameterDirectionKind">pdkReturn</XPD:ATTR>
+<XPD:ATTR name="TypeExpression" type="string">int</XPD:ATTR>
+<XPD:REF name="BehavioralFeature">fZM4p0yP00qb7NaEFnWIeAAA</XPD:REF>
+</XPD:OBJ>
+</XPD:OBJ>
+<XPD:OBJ name="Operations[1]" type="UMLOperation" guid="7RmfNHtznUyLvIdzaigahgAA">
+<XPD:ATTR name="Name" type="string">Operation1</XPD:ATTR>
+<XPD:REF name="Owner">fy/2wpY630+hBsjL8wW/fgAA</XPD:REF>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:OBJ>
+<XPD:OBJ name="OwnedElements[1]" type="UMLPackage" guid="/GZvnYBLhUmoW0EU+XEZJAAA">
+<XPD:ATTR name="Name" type="string">RemoteClient</XPD:ATTR>
+<XPD:REF name="Namespace">xd7GrtXxl0aLb//v+mvBzwAA</XPD:REF>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:BODY>
+</XPD:PROJECT>
