@@ -311,7 +311,7 @@ unsigned __stdcall threadLockDlg(void* arg) {
         int nWidth = rtText.Width();//w0
         int x = (rect.right - nWidth) / 2;
         int nHeight = rtText.Height();
-        int y = (rect.bottom - nHeight) / 2;
+        int y = (rect.bottom - nHeight) / 2; 
         pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
     }
     //窗口置顶
