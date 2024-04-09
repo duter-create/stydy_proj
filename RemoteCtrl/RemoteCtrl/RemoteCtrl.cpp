@@ -301,19 +301,32 @@ unsigned __stdcall threadLockDlg(void* arg) {
     rect.top = 0;
     rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
     rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
+    rect.bottom = LONG(rect.bottom * 1.10);
     TRACE("right = %d bottom = %d\r\n", rect.right, rect.bottom);
     dlg.MoveWindow(rect);
+    CWnd* pText = dlg.GetDlgItem(IDC_STATIC);
+    if (pText) {
+        CRect rtText;
+        pText->GetWindowRect(rtText);
+        int nWidth = rtText.Width();//w0
+        int x = (rect.right - nWidth) / 2;
+        int nHeight = rtText.Height();
+        int y = (rect.bottom - nHeight) / 2;
+        pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
+    }
+    //窗口置顶
     dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);//将 dlg 对话框保持在所有窗口的最上层，但是不改变其大小和位置。
     //限制鼠标功能
-    //ShowCursor(false);//隐藏光标
+    ShowCursor(false);//隐藏光标
     //隐藏任务栏
     ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);//寻找类名为 Shell_TrayWnd（即 Windows 任务栏）的窗口，然后通过 ShowWindow 函数将其设置为显示状态。这通常会导致原本隐藏的任务栏被显示出来。
     //限制鼠标活动范围
-    //dlg.GetWindowRect(rect);//GetWindowRect 函数获取了 dlg 窗口在屏幕上的位置和尺寸，再赋值给 rect
+    dlg.GetWindowRect(rect);//GetWindowRect 函数获取了 dlg 窗口在屏幕上的位置和尺寸，再赋值给 rect
     rect.left = 0;
     rect.top = 0;
     rect.right = 1;
     rect.bottom = 1;
+    //限制鼠标范围
     ClipCursor(rect);
     MSG msg;
     /*消息循环
@@ -332,8 +345,11 @@ unsigned __stdcall threadLockDlg(void* arg) {
             }
         }
     }
-
+    //恢复鼠标范围
+    ClipCursor(NULL);
+    //恢复鼠标
     ShowCursor(true);
+    //恢复任务栏
     ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);//寻找类名为 Shell_TrayWnd（即 Windows 任务栏）的窗口，然后通过 ShowWindow 函数将其设置为显示状态。这通常会导致原本隐藏的任务栏被显示出来。
     dlg.DestroyWindow();
     _endthreadex(0);
@@ -357,7 +373,7 @@ int UnlockMachine() {
     //::SendMessage(dlg.m_hWnd, WM_KEYDOWN, 0x41, 0x01E0001);
     PostThreadMessage(threadid, WM_KEYDOWN,0x41, 0);//将一个消息(键盘)投递到指定线程(threadid)—的消息队列中
     //消息是跟着线程来的，不是跟着对话框，句柄来的
-    CPacket pack(7, NULL, 0);
+    CPacket pack(8, NULL, 0);
     CServerSocket::getInstance()->Send(pack);
     return 0;
 }
