@@ -62,6 +62,7 @@ int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息�
         return -1;
     }
     if (_chdir(strPath.c_str()) != 0) {//更改当前工作目录为strpath指向的路径
+        //_chdir:更改当前的工作目录
         FILEINFO finfo;//当目录由于权限不足无法切换时
         finfo.HasNext = FALSE;
         CPacket pack(2, (BYTE*) & finfo, sizeof(finfo));
