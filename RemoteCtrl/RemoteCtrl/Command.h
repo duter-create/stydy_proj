@@ -9,6 +9,7 @@
 #include <io.h>
 #include <list>
 #include "LockDialog.h"
+#include "Packet.h"
 #pragma warning(disable:4966) //fopen sprintf strcpy strstr
 
 class CCommand
@@ -16,9 +17,22 @@ class CCommand
 public:
 	CCommand();
 	~CCommand() {};
-	int ExcuteCommand(int nCmd);
+	int ExcuteCommand(int nCmd, std::list<CPacket>& lstPacket,CPacket& inPacket);
+    static void RunCommand(void* arg, int status,std::list<CPacket>& lstPacket, CPacket& inPacket) {
+        CCommand* thiz = (CCommand*)arg;
+        if (status > 0) {
+            int ret = thiz->ExcuteCommand(status,lstPacket,inPacket);
+            if (ret != 0) {
+                TRACE("执行命令失败: %d ret=%d\r\n",status,ret);
+            }
+        }
+        else {
+            MessageBox(NULL, _T("无法正常接入用户，自动重试"), _T("接入用户失败！"), MB_OK | MB_ICONERROR);
+        }
+
+    }
 protected:
-	typedef int(CCommand::* CMDFUNC)();//成员函数指针
+	typedef int(CCommand::* CMDFUNC)(std::list<CPacket>&, CPacket& inPacket);//成员函数指针
 	std::map<int, CMDFUNC> m_mapFunction;//函数映射表，从命令号到功能的映射，取代switch
     CLockDialog dlg;
     unsigned threadid;
@@ -94,7 +108,7 @@ protected:
         ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);//寻找类名为 Shell_TrayWnd（即 Windows 任务栏）的窗口，然后通过 ShowWindow 函数将其设置为显示状态。这通常会导致原本隐藏的任务栏被显示出来。
         dlg.DestroyWindow();
     }
-    int MakeDriverInfo() {//创建裆前系统可用的磁盘分区信息,1代表A盘，2代表B盘...26代表Z盘
+    int MakeDriverInfo(std::list<CPacket>& lstPacket, CPacket& inPacket) {//创建裆前系统可用的磁盘分区信息,1代表A盘，2代表B盘...26代表Z盘
         std::string result;//存储结果字符串
         for (int i = 1; i <= 26; i++) {
             int ret = _chdrive(i);
@@ -104,25 +118,18 @@ protected:
                 result += 'A' + i - 1;
             }
         }
-        CPacket pack(1, (BYTE*)result.c_str(), result.size());//创建CPacket实例打包用的
-        ClassTool::Dump((BYTE*)pack.Data(), pack.Size());//输出pack的数据内容
-        CServerSocket::getInstance()->Send(pack);
+        lstPacket.push_back(CPacket(1, (BYTE*)result.c_str(), result.size()));
         return 0;
     }
 
-    int MakeDirectoryInfo() {//用来收集特定路径下的文件和目录信息，并在发生错误的时候输出调试信息
-        std::string strPath;
+    int MakeDirectoryInfo(std::list<CPacket>& lstPacket, CPacket& inPacket) {//用来收集特定路径下的文件和目录信息，并在发生错误的时候输出调试信息
+        std::string strPath = inPacket.strData;
         //std::initializer_list<FILEINFO> lstFileInfos;
-        if (CServerSocket::getInstance()->GetFilePath(strPath) == false) {
-            OutputDebugString(_T("当前的命令，不是获取文件列表，命令解析错误"));
-            return -1;
-        }
         if (_chdir(strPath.c_str()) != 0) {//更改当前工作目录为strpath指向的路径
             //_chdir:更改当前的工作目录
             FILEINFO finfo;//当目录由于权限不足无法切换时
             finfo.HasNext = FALSE;
-            CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
-            CServerSocket::getInstance()->Send(pack);
+            lstPacket.push_back(CPacket(2, (BYTE*)&finfo, sizeof(finfo)));
             OutputDebugString(_T("没有权限访问目录"));
             return -2;
         }
@@ -132,8 +139,7 @@ protected:
             OutputDebugString(_T("没有找到任何文件"));
             FILEINFO finfo;
             finfo.HasNext = FALSE;
-            CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
-            CServerSocket::getInstance()->Send(pack);
+            lstPacket.push_back(CPacket(2, (BYTE*)&finfo, sizeof(finfo)));
             return -3;
         }
         int count = 0;
@@ -142,22 +148,19 @@ protected:
             finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;//判断当前处理的文件项是不是目录
             memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
             TRACE("%s\r\n", finfo.szFileName);
-            CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
-            CServerSocket::getInstance()->Send(pack);
+            lstPacket.push_back(CPacket(2, (BYTE*)&finfo, sizeof(finfo)));
             count++;
         } while (!_findnext(hfind, &fdata));//获取下一个文件项信息
         TRACE("server: count = %d\r\n", count);
         //发送信息到客户端 
         FILEINFO finfo;
         finfo.HasNext = FALSE;
-        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
-        CServerSocket::getInstance()->Send(pack);
+        lstPacket.push_back(CPacket(2, (BYTE*)&finfo, sizeof(finfo)));
         return 0;
     }
 
-    int RunFile() {
-        std::string strPath;
-        CServerSocket::getInstance()->GetFilePath(strPath);
+    int RunFile(std::list<CPacket>& lstPacket, CPacket& inPacket) {
+        std::string strPath = inPacket.strData;
         ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);//将在用户的机器上运行一个程序或打开一个文件，具体行为取决于文件类型的关联程序。比如，如果路径是一个可执行文件，则会运行该程序；如果路径是文档文件，则会打开与之关联的应用程序查看该文档。
         /*
         ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);：调用 Win32 API 函数 ShellExecuteA 来执行或打开 strPath 变量中的文件。此函数的参数解释如下：
@@ -168,141 +171,128 @@ protected:
         NULL：默认目录设置为 NULL，所以执行文件时会使用它的默认目录。
         SW_SHOWNORMAL：指定窗口的显示方式，SW_SHOWNORMAL 为普通窗口大小。
         */
-        CPacket pack(3, NULL, 0);
-        CServerSocket::getInstance()->Send(pack);
+        lstPacket.push_back(CPacket(3, NULL, 0));
         return 0;
     }
 
 
-    int DownloadFile() {//下载文件，即把文件从服务端发送到客户端
-        std::string strPath;
-        CServerSocket::getInstance()->GetFilePath(strPath);
+    int DownloadFile(std::list<CPacket>& lstPacket, CPacket& inPacket) {//下载文件，即把文件从服务端发送到客户端
+        std::string strPath = inPacket.strData;
         long long data = 0;
         FILE* pFile = NULL;
         errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");//rb:二进制读取模式，文件指针pfile
         if (err != 0) {//打开文件失败
-            CPacket pack(4, (BYTE*)&data, 8);
-            CServerSocket::getInstance()->Send(pack);
+            lstPacket.push_back(CPacket(4, (BYTE*)&data, 8));
             return -1;
         }
         if (pFile != NULL) {
             fseek(pFile, 0, SEEK_END);//用fseek函数将文件指针pfile移动到文件末尾
             data = _ftelli64(pFile);//_ftelli64：获取文件大小
-            CPacket head(4, (BYTE*)&data, 8);
-            CServerSocket::getInstance()->Send(head);
+            lstPacket.push_back(CPacket(4, (BYTE*)&data, 8));
             fseek(pFile, 0, SEEK_SET);//用fseek函数将文件指针pfile定位到文件起始位置
             char buffer[1024] = "";
             size_t rlen = 0;//fread返回值
             do {
                 rlen = fread(buffer, 1, 1024, pFile);//在buffer里读，一次读1字节，读1024次
-                CPacket pack(4, (BYTE*)buffer, rlen);
-                CServerSocket::getInstance()->Send(pack);
+                lstPacket.push_back(CPacket(4, (BYTE*)&data, 8));
             } while (rlen >= 1024);
             fclose(pFile);
         }
-        CPacket pack(4, NULL, 0);
-        CServerSocket::getInstance()->Send(pack);
+        lstPacket.push_back(CPacket(4, (BYTE*)&data, 8));
         return 0;
     }
 
-    int MouseEvent() {//处理鼠标事件
+    int MouseEvent(std::list<CPacket>& lstPacket, CPacket& inPacket) {//处理鼠标事件
         MOUSEEV mouse;
-        if (CServerSocket::getInstance()->GetMouseEvent(mouse)) {
-            DWORD nFlags = 0;//根据鼠标的按钮和操作设置标志位
+        memcpy(&mouse, inPacket.strData.c_str(), sizeof(MOUSEEV));
+        DWORD nFlags = 0;//根据鼠标的按钮和操作设置标志位
 
-            switch (mouse.nButton) {
-            case 0://左键
-                nFlags = 1;
-                break;
-            case 1://右键
-                nFlags = 2;
-                break;
-            case 2://中键
-                nFlags = 4;
-                break;
-            case 4://没有按键
-                nFlags = 8;
-                break;
-            }
-            if (nFlags != 8)
-                SetCursorPos(mouse.ptXY.x, mouse.ptXY.y);//将光标移动到鼠标事件指定的屏幕坐标
-            switch (mouse.nAction)
-            {
-                //nFlags 之前存储了哪个鼠标按钮被按下的信息，通过|=再加上鼠标动作的信息（二进制高位低位）
-            case 0://单击
-                nFlags |= 0x10;
-                break;
-            case 1://双击
-                nFlags |= 0x20;
-                break;
-            case 2://按下
-                nFlags |= 0x40;
-                break;
-            case 3://放开
-                nFlags |= 0x80;
-                break;
-            default:
-                break;
-            }
-            TRACE("mouse event : %08X x %d y %d \r\n", nFlags, mouse.ptXY.x, mouse.ptXY.y);
-            switch (nFlags)
-            {
-            case 0x21://左键双击
-                mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
-                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
-            case 0x11://左键单击
-                mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
-                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x41://左键按下
-                mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x81://左键放开
-                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x22://右键双击
-                mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
-                mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
-            case 0x12://右键单击
-                mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
-                mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x42://右键按下
-                mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x82://右键放开
-                mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x24://中键双击
-                mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
-                mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
-            case 0x14://中键单击
-                mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
-                mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
-                break;
-
-            case 0x44://中键按下
-                mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x84://中键放开
-                mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
-                break;
-            case 0x08://单纯的鼠标移动
-                mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo());
-                break;
-            }
-            CPacket pack(4, NULL, 0);
-            CServerSocket::getInstance()->Send(pack);
+        switch (mouse.nButton) {
+        case 0://左键
+            nFlags = 1;
+            break;
+        case 1://右键
+            nFlags = 2;
+            break;
+        case 2://中键
+            nFlags = 4;
+            break;
+        case 4://没有按键
+            nFlags = 8;
+            break;
         }
-        else {
-            OutputDebugString(_T("获取鼠标参数失败"));
-            return -1;
-
+        if (nFlags != 8)
+            SetCursorPos(mouse.ptXY.x, mouse.ptXY.y);//将光标移动到鼠标事件指定的屏幕坐标
+        switch (mouse.nAction)
+        {
+            //nFlags 之前存储了哪个鼠标按钮被按下的信息，通过|=再加上鼠标动作的信息（二进制高位低位）
+        case 0://单击
+            nFlags |= 0x10;
+            break;
+        case 1://双击
+            nFlags |= 0x20;
+            break;
+        case 2://按下
+            nFlags |= 0x40;
+            break;
+        case 3://放开
+            nFlags |= 0x80;
+            break;
+        default:
+            break;
         }
+        TRACE("mouse event : %08X x %d y %d \r\n", nFlags, mouse.ptXY.x, mouse.ptXY.y);
+        switch (nFlags)
+        {
+        case 0x21://左键双击
+            mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+            mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+        case 0x11://左键单击
+            mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+            mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x41://左键按下
+            mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x81://左键放开
+            mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x22://右键双击
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+            mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+        case 0x12://右键单击
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+            mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x42://右键按下
+            mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x82://右键放开
+            mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x24://中键双击
+            mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+            mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+        case 0x14://中键单击
+            mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+            mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+            break;
+
+        case 0x44://中键按下
+            mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x84://中键放开
+            mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+            break;
+        case 0x08://单纯的鼠标移动
+            mouse_event(MOUSEEVENTF_MOVE, mouse.ptXY.x, mouse.ptXY.y, 0, GetMessageExtraInfo());
+            break;
+        }
+        lstPacket.push_back(CPacket(5, NULL, 0));
         return 0;
     }
 
-    int SendScreen() {
+    int SendScreen(std::list<CPacket>& lstPacket, CPacket& inPacket) {
         CImage screen;//GDI(全局设备接口)
         HDC hScreen = ::GetDC(NULL);//获取设备上下文（整个屏幕）句柄，HDC(Handle to device context
         //::表示是全局函数，即需要创建对象就可以直接调用该函数，且该函数定义在全局命名空间中。
@@ -325,8 +315,7 @@ protected:
             pStream->Seek(bg, STREAM_SEEK_SET, NULL);//重置流的内部位置指针到流的开始处
             PBYTE pData = (BYTE*)GlobalLock(hMem);//对一个全局内存对象进行锁定，并获取到指向内存对象数据的指针。
             SIZE_T nSize = GlobalSize(hMem);
-            CPacket pack(6, pData, nSize);
-            CServerSocket::getInstance()->Send(pack);
+            lstPacket.push_back(CPacket(6, pData, nSize));
             GlobalUnlock(hMem);
         }
 
@@ -342,39 +331,34 @@ protected:
         screen.ReleaseDC();
         return 0;
     }
-    int LockMachine() {
+    int LockMachine(std::list<CPacket>& lstPacket, CPacket& inPacket) {
         if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE) {//dlg的句柄为空或无效
             //_beginthread 创建的线程应该自行结束，因此在该线程开始后，LockMachine 函数将立即结束而不等待新线程的结束
             //_beginthread(threadLockDlg, 0, NULL);//_beginthread创建新线程，用函数指针threadLockDlg指向线程应该执行的函数
             _beginthreadex(NULL, 0, &CCommand::threadLockDlg, this, 0, &threadid);
             TRACE("threadid=%d\r\n", threadid);
         }
-        CPacket pack(7, NULL, 0);
-        CServerSocket::getInstance()->Send(pack);
+        lstPacket.push_back(CPacket(7, NULL,0));
         return 0;
     }
 
-    int UnlockMachine() {
+    int UnlockMachine(std::list<CPacket>& lstPacket, CPacket& inPacket) {
         //dlg.SendMessage(WM_KEYDOWN,0x41, LPARAM(001E0001));
         //::SendMessage(dlg.m_hWnd, WM_KEYDOWN, 0x41, 0x01E0001);
         PostThreadMessage(threadid, WM_KEYDOWN, 0x41, 0);//将一个消息(键盘)投递到指定线程(threadid)—的消息队列中
         //消息是跟着线程来的，不是跟着对话框，句柄来的
-        CPacket pack(8, NULL, 0);
-        CServerSocket::getInstance()->Send(pack);
+        lstPacket.push_back(CPacket(8, NULL, 0));
         return 0;
     }
 
-    int TestConnect() {
-        CPacket pack(1981, NULL, 0);
-        bool ret = CServerSocket::getInstance()->Send(pack);
-        TRACE("Send ret = %d\r\n", ret);
+    int TestConnect(std::list<CPacket>& lstPacket, CPacket& inPacket) {
+        lstPacket.push_back(CPacket(1981, NULL, 0));
         return 0;
     }
 
-    int DeleteLocalFile()
+    int DeleteLocalFile(std::list<CPacket>& lstPacket, CPacket& inPacket)
     {
-        std::string strPath;//存储文件路径
-        CServerSocket::getInstance()->GetFilePath(strPath);//文件路径赋值给strpath
+        std::string strPath = inPacket.strData;
         TCHAR sPath[MAX_PATH] = _T("");//使用系统定义的 MAX_PATH（通常为 260）声明一个 TCHAR 类型的数组 sPath，用于存储转换为宽字符格式后的文件路径。
         //_T("") 是一个宏，它用于根据项目是否支持 Unicode 而生成适当编码的字符串常量
         //mbstowcs(sPath, strPath.c_str(), strPath.size());会乱码
@@ -384,9 +368,7 @@ protected:
             sizeof(sPath) / sizeof(TCHAR));
         DeleteFileA(strPath.c_str());
         //调用 Windows API 函数 DeleteFile 删除名为 sPath 的文件。如果函数成功，文件将被标记为删除，并在最后一个句柄关闭时删除。
-        CPacket pack(9, NULL, 0);
-        bool ret = CServerSocket::getInstance()->Send(pack);
-        TRACE("Send ret = %d\r\n", ret);
+        lstPacket.push_back(CPacket(9, NULL, 0));
         return 0;
     }
 };

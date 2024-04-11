@@ -40,40 +40,18 @@ int main()
         }
         else
         {
-            //1 进度的可控性 2 对接的方便性 3 可行性评估，提早暴漏风险
-            // TODO: socket,bind,listen,accept,read,write,close
-            //套接字初始化
             CCommand cmd;
-            CServerSocket* pserver = CServerSocket::getInstance();//服务器创建单例
-            int count = 0;
-            if (pserver->InitSocket() == false) {//初始化
+           int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);//服务器创建单例
+            switch (ret) {
+            case -1:
                 MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状态！"), _T("网络初始化失败！"), MB_OK | MB_ICONERROR);
                 exit(0);
+                break;
+            case -2:
+                MessageBox(NULL, _T("多次无法接入用户，结束程序！"), _T("接入用户失败！"), MB_OK | MB_ICONERROR);
+                exit(0);
+                break;
             }
-            while (CServerSocket::getInstance() != NULL) {
-                if (pserver->AcceptClient() == false) {
-                    if (count >= 3) {
-                        MessageBox(NULL, _T("多次无法接入用户，结束程序！"), _T("接入用户失败！"), MB_OK | MB_ICONERROR);
-                        exit(0);
-                    }
-                    MessageBox(NULL, _T("无法正常接入用户，自动重试"), _T("接入用户失败！"), MB_OK | MB_ICONERROR);
-                    count++;
-                }
-                TRACE("AcceptClient return true\r\n");
-                int ret = pserver->DealCommand();
-                TRACE("DealCommand ret %d\r\n", ret);
-                if (ret > 0) {
-                    ret = cmd.ExcuteCommand(ret);//短链接，以控制为目标而不以文件传输下载为目标
-                    if (ret != 0) {
-                        TRACE("执行命令失败:%d ret=%d\r\n", pserver->GetPacket().sCmd, ret);
-                    }
-                    pserver->CloseClient();//短链接
-                    TRACE("Command has done\r\n");                }
-            }
-            //静态变量
-            //在第一次调用的时候初始化，在程序销毁的时候被销毁
-            //全局静态变量
-            //在main函数之前被初始化，在整个程序结束之后被析构
         }
     }
     else
