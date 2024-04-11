@@ -1,2 +1,8 @@
-﻿  RemoteClientDlg.cpp
+﻿  pch.cpp
+  ClientSocket.cpp
+  RemoteClient.cpp
+  RemoteClientDlg.cpp
+  StatusDlg.cpp
+  WatchDialog.cpp
+  正在生成代码...
   RemoteClient.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteClient.exe

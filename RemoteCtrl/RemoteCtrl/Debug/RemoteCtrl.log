@@ -1,4 +1,6 @@
 ﻿  pch.cpp
+  ClassTool.cpp
+  Command.cpp
   LockDialog.cpp
   RemoteCtrl.cpp
   ServerSocket.cpp
