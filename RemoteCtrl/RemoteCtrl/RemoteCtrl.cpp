@@ -41,7 +41,7 @@ int main()
         else
         {
             CCommand cmd;
-           int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);//服务器创建单例
+            int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);//服务器创建单例
             switch (ret) {
             case -1:
                 MessageBox(NULL, _T("网络初始化异常，未能成功初始化，请检查网络状态！"), _T("网络初始化失败！"), MB_OK | MB_ICONERROR);
