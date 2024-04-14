@@ -244,7 +244,6 @@ void CWatchDialog::OnMouseMove(UINT nFlags, CPoint point)
 	CDialog::OnMouseMove(nFlags, point);
 }
 
-
 void CWatchDialog::OnStnClickedWatch()
 {
 	if ((m_nObjWidth != -1) && (m_nObjHeight != -1)) {
@@ -263,14 +262,12 @@ void CWatchDialog::OnStnClickedWatch()
 	}
 }
 
-
 void CWatchDialog::OnOK()
 {
 	// TODO: 在此添加专用代码和/或调用基类
 
 	//CDialog::OnOK();
 }
-
 
 void CWatchDialog::OnBnClickedBtnLock()
 {
