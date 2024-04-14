@@ -13,7 +13,7 @@ public:
 	virtual ~CWatchDialog();
 
 // 对话框数据
-#ifdef AFX_DESIGN_TIME
+#ifdef AFX_DESIGN_TIME 
 	enum { IDD = IDD_DLG_WATCH };
 #endif
 public:
