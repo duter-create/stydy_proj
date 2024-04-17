@@ -5,6 +5,7 @@
 #include "StatusDlg.h"
 #include <map>
 #include "resource.h"
+#include "ClassTool.h"
 
 #define WM_SEND_PACK (WM_USER+1)//发送包数据
 #define WM_SEND_DATA (WM_USER+2)//发送数据
@@ -25,10 +26,96 @@ public:
 	int Invoke(CWnd*& pMainWnd);
 	//发送消息
 	LRESULT SendMessage(MSG msg);
+	//更新网络服务器的地址
+	void UpdateAddress(int nIP, int nPort) {
+		CClientSocket::getInstance()->UpdateAddress(nIP, nPort);
+	}
+	int DealCommand() {
+		return CClientSocket::getInstance()->DealCommand();
+	}
+	void CloseSocket() {
+		CClientSocket::getInstance()->CloseSocket();
+	}
+	bool SendPacket(const CPacket& pack) {
+		CClientSocket* pClient = CClientSocket::getInstance();
+		if (pClient->InitSocket() == false)
+			return false;
+		pClient->Send(pack);
+	}
+	//1 可以查看磁盘分区 
+//2 查看指定目录下的文件
+//3 打开文件
+//4 下载文件
+//5 鼠标操作
+//6 发送屏幕内容
+//7 锁机
+//8 解锁 
+//9 删除文件
+//1981 测试链接
+//返回值是命令号，如果小于0则是错误
+	int SendCommandPacket(int nCmd, 
+		bool bAutoClose = true, 
+		BYTE* pData = NULL, 
+		size_t nLength = 0) 
+	{
+		CClientSocket* pClient = CClientSocket::getInstance();
+		if (pClient->InitSocket() == false)
+			return false;
+		pClient->Send(CPacket(nCmd,pData,nLength));
+		int cmd = DealCommand();
+		TRACE("ack:%d\r\n", cmd);
+		if (bAutoClose) {
+			CloseSocket();
+		}
+		return cmd;
+	}
+
+	int GetImage(CImage& image) {
+		CClientSocket* pClient = CClientSocket::getInstance();
+		return ClassTool::Bytes2Image(image, pClient->GetPacket().strData.c_str());	
+	}
+
+
+	int DownFile(CString strPath) {
+		CFileDialog dlg(FALSE, NULL,
+			strPath,
+			OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+			NULL, &m_remoteDlg);
+		//以模态方式显示对话框。如果用户点击“保存”按钮（通常响应为 IDOK）
+		// 则 DoModal 方法会返回 IDOK，代码将进入到 if 语句块内执行
+		if (dlg.DoModal() == IDOK) {
+			m_strRemote = strPath;
+			m_strLocal = dlg.GetPathName();
+			m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+			//1 作为线程入口点，这个函数将在新线程中执行
+			//2 0是初始线程堆栈大小的参数。数值0表示使用默认的大小
+			//3 传递给线程的参数。在这种情况下，this 指针指向当前正在执行 _beginthread 调用的类实例 CRemoteClientDlg 对象。
+			
+			if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
+				return -1;
+			}
+			m_remoteDlg.BeginWaitCursor();
+			m_statusDlg.m_info.SetWindowText(_T("命令正在执行中"));//SetWindowText 方法用于设置 m_info 控件的文本内容。在这里，它被设置为显示 "命令正在执行中"
+			m_statusDlg.ShowWindow(SW_SHOW);
+			m_statusDlg.CenterWindow(&m_remoteDlg);
+			m_statusDlg.SetActiveWindow();//使 m_dlgStatus 对话框成为当前活动窗口,将对话框带到屏幕的最前端
+		}
+		return 0;
+	}
+
+	void StartWatchScreen();
 protected:
+	void threadWatchScreen();
+	static void threadWatchScreen(void* arg);
+
+	void threadDownloadFile();
+	static void threadDownloadEntry(void* arg);
 	CClientController():
 		m_statusDlg(&m_remoteDlg),m_watchDlg(&m_remoteDlg) 
 	{
+		bool m_isClose = true;
+		m_hThreadWatch = INVALID_HANDLE_VALUE;
+		m_hThreadDownload = INVALID_HANDLE_VALUE;
 		m_hThread = INVALID_HANDLE_VALUE;
 		m_nThreadID = -1;
 	}
@@ -83,6 +170,11 @@ private:
 	CRemoteClientDlg m_remoteDlg;
 	CStatusDlg m_statusDlg;
 	HANDLE m_hThread;//存储线程句柄
+	HANDLE m_hThreadDownload;
+	HANDLE m_hThreadWatch;
+	bool m_isClosed;//监视是否关闭
+	CString m_strRemote;//下载文件的远程路径
+	CString m_strLocal;//下载文件的本地保存路径
 	unsigned m_nThreadID;//存储线程ID
 	static CClientController* m_instance;//使用 static 表示这个变量是该类的所有实例共享的，而不是每个实例拥有自己的拷贝。这确保了无论创建多少个 CClientController 对象，m_instance 都指向同一个对象地址。
 	class CHelper {//在单例模式中管理生命周期，确保单例的实例正确的在程序结束时被销毁
