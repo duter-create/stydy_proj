@@ -143,6 +143,7 @@ public:
 	static CClientSocket* getInstance() {
 		if (m_instance == NULL) {//静态函数没有this指针，不能直接访问成员变量
 			m_instance = new CClientSocket();
+			TRACE("CClientSocket size is %d\r\n", sizeof(*m_instance));
 		}
 		return m_instance;
 	}
@@ -180,17 +181,18 @@ public:
 		if (m_sock == -1)
 			return -1;
 		//char buffer[1024] = "";
-		char* buffer = m_buffer.data();
+		char* buffer = m_buffer.data();//TODO:多线程发生命令时可能会出现冲突
 		static size_t index = 0;//index应该是静态变量，不然每次循环都会被初始化
 		while (true) {
 			size_t len = recv(m_sock, buffer + index, BUFFER_SIZE - index, 0);//之前接收的数据不会被覆盖，并且不会超过buffer的边界
-			if (len <= 0 && (index <= 0)) {//len 是 recv 函数的返回值，代表在最近的一次调用中从网络接收到的字节数;index 表示 buffer 中已经累积的数据长度。
+			if ((int)len <= 0 && ((int)index <= 0)) {//len 是 recv 函数的返回值，代表在最近的一次调用中从网络接收到的字节数;index 表示 buffer 中已经累积的数据长度。
 				return -1;
 			}
-			//Dump((BYTE*)buffer, index);
+			TRACE("recv len = %d(0x%08X) index = %d(0x%08X)\r\n", len,len,index,index);
 			index += len;
 			len = index;
 			m_packet = CPacket((BYTE*)buffer, len);
+			TRACE("command %d\r\n", m_packet.sCmd);
 			if (len > 0) {
 				memmove(buffer, buffer + len, index - len);
 				index -= len;
@@ -271,10 +273,12 @@ private:
 		else return TRUE;
 	}
 	static void releaseInstance() {
+		TRACE("CClientSocket has called\r\n");
 		if (m_instance != NULL) {
 			CClientSocket* tmp = m_instance;
 			m_instance = NULL;
 			delete tmp;
+			TRACE("CClientSocket has released\r\n");
 		}
 	}
 	static CClientSocket* m_instance;

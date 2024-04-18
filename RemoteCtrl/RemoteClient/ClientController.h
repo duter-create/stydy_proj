@@ -13,6 +13,10 @@
 #define WM_SHOW_WATCH (WM_USER+4)//远程监控
 #define WM_SEND_MESSAGE (WM_USER+0x1000)//自定义消息处理
 
+//业务逻辑和流程，是随时可能发生改变的！！！
+//业务逻辑和流程，是随时可能发生改变的！！！
+//业务逻辑和流程，是随时可能发生改变的！！！
+
 class CClientController
 {
 public:
@@ -53,55 +57,18 @@ public:
 //9 删除文件
 //1981 测试链接
 //返回值是命令号，如果小于0则是错误
-	int SendCommandPacket(int nCmd, 
-		bool bAutoClose = true, 
-		BYTE* pData = NULL, 
-		size_t nLength = 0) 
-	{
-		CClientSocket* pClient = CClientSocket::getInstance();
-		if (pClient->InitSocket() == false)
-			return false;
-		pClient->Send(CPacket(nCmd,pData,nLength));
-		int cmd = DealCommand();
-		TRACE("ack:%d\r\n", cmd);
-		if (bAutoClose) {
-			CloseSocket();
-		}
-		return cmd;
-	}
-
+	int SendCommandPacket(int nCmd,
+		bool bAutoClose = true,
+		BYTE* pData = NULL,
+		size_t nLength = 0);
+	
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
 		return ClassTool::Bytes2Image(image, pClient->GetPacket().strData.c_str());	
 	}
 
 
-	int DownFile(CString strPath) {
-		CFileDialog dlg(FALSE, NULL,
-			strPath,
-			OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-			NULL, &m_remoteDlg);
-		//以模态方式显示对话框。如果用户点击“保存”按钮（通常响应为 IDOK）
-		// 则 DoModal 方法会返回 IDOK，代码将进入到 if 语句块内执行
-		if (dlg.DoModal() == IDOK) {
-			m_strRemote = strPath;
-			m_strLocal = dlg.GetPathName();
-			m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
-			//1 作为线程入口点，这个函数将在新线程中执行
-			//2 0是初始线程堆栈大小的参数。数值0表示使用默认的大小
-			//3 传递给线程的参数。在这种情况下，this 指针指向当前正在执行 _beginthread 调用的类实例 CRemoteClientDlg 对象。
-			
-			if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
-				return -1;
-			}
-			m_remoteDlg.BeginWaitCursor();
-			m_statusDlg.m_info.SetWindowText(_T("命令正在执行中"));//SetWindowText 方法用于设置 m_info 控件的文本内容。在这里，它被设置为显示 "命令正在执行中"
-			m_statusDlg.ShowWindow(SW_SHOW);
-			m_statusDlg.CenterWindow(&m_remoteDlg);
-			m_statusDlg.SetActiveWindow();//使 m_dlgStatus 对话框成为当前活动窗口,将对话框带到屏幕的最前端
-		}
-		return 0;
-	}
+	int DownFile(CString strPath);
 
 	void StartWatchScreen();
 protected:
@@ -128,9 +95,11 @@ protected:
 	//线程的入口点，用于创建线程以异步执行某些任务
 	static unsigned __stdcall threadEntry(void* arg);
 	static void releaseInstance() {
+		TRACE("CClientSocket has been called\r\n");
 		if (m_instance != NULL) {
 			delete m_instance;
 			m_instance = NULL;
+			TRACE("CClientController has released\r\n");
 		}
 	}
 	LRESULT OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lPARAM);
@@ -180,7 +149,7 @@ private:
 	class CHelper {//在单例模式中管理生命周期，确保单例的实例正确的在程序结束时被销毁
 	public:
 		CHelper() {//管理 CClientController 单例的生命周期
-			CClientController::getInstance();
+			//CClientController::getInstance();
 		}
 		~CHelper() {
 			CClientController::releaseInstance();

@@ -7,7 +7,7 @@
 #include "ClientSocket.h"
 #include "StatusDlg.h"
 
-#define WM_SEND_PACKET (WM_USER + 1) //第一步，自定义消息的ID
+//#define WM_SEND_PACKET (WM_USER + 1) //第一步，自定义消息的ID
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
 {
@@ -23,18 +23,14 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 public:
-	bool isFull() const {//表示这个成员函数不会修改任何成员变量的值
-		return m_isFull;
-	}
+
 	CImage& GetImage() {
 		return m_image;
 	}
-	void SetImageStatus(bool isFull = false) {
-		m_isFull = isFull;
-	}
+
 private:
 	CImage m_image;//缓存
-	bool m_isFull;//缓存是否有数据，true表示有缓存，false表示没有缓存数据,初始化时设置false
+
 	bool m_isClosed;//监视是否关闭
 private:
 	void LoadFileCurrent();
@@ -71,7 +67,7 @@ public:
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
 	//第二步，定义自定义消息响应函数
-	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);//在类的声明中用来定义一个消息处理函数。这个函数是为了响应自定义或已定义的 Windows 消息
+	//afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);//在类的声明中用来定义一个消息处理函数。这个函数是为了响应自定义或已定义的 Windows 消息
 	//OnSendPacket: 这是函数的名称。按照MFC的命名惯例，消息处理函数的名称通常以 "On" 开头，后跟消息的名称。
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);

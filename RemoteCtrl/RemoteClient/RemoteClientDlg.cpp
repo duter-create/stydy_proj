@@ -82,7 +82,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
-	ON_MESSAGE(WM_SEND_PACKET,&CRemoteClientDlg::OnSendPacket)//第三步，在消息映射表里面注册消息
+	//ON_MESSAGE(WM_SEND_PACKET,&CRemoteClientDlg::OnSendPacket)//第三步，在消息映射表里面注册消息
 	//将 Windows 消息（在这里是 WM_SEND_PACKET）映射到特定消息处理函数（在这里是 CRemoteClientDlg::OnSendPacket）的一种方法。这段代码通常在一个消息映射宏列表中。
 	//WM_SEND_PACKET是用户自定义的待处理的消息
 	//&CRemoteClientDlg::OnSendPacket是用来处理这个消息的函数。这个函数必须是声明在接收处理消息的类（在这里是 CRemoteClientDlg）内的成员函数。
@@ -134,7 +134,6 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	UpdateData(FALSE);
 	m_dlgStatus.Create(IDD_DLG_STATUS,this);
 	m_dlgStatus.FlashWindow(SW_HIDE);
-	m_isFull = false;
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -400,38 +399,6 @@ void CRemoteClientDlg::OnRunFile()
 		AfxMessageBox("打开文件命令执行失败");
 	}
 }
-
-LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)//第四步：实现消息响应函数
-{//类 CRemoteClientDlg 中的一个消息处理函数 OnSendPacket 的定义。
-//函数 OnSendPacket 响应自定义的 WM_SEND_PACKET 消息，并执行发送命令到服务器的操作。
-	int ret = 0;
-	int cmd = wParam >> 1;
-	switch (cmd) {
-	case 4:
-	{
-		CString strFile = (LPCSTR)lParam;
-		//int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
-		//只接收两个函数的处理
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCSTR)strFile, strFile.GetLength());//发送下载命令到服务器
-	}
-	break;
-	case 5: {//鼠标操作
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
-	}
-	break;
-	case 6:
-	case 7:
-	case 8:
-	{
-		ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1);//发送下载命令到服务器
-	}
-	break;
-	default:
-		ret = -1;
-	}
-	return ret;
-}
-
 /*
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {

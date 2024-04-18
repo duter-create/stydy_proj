@@ -4,11 +4,13 @@
 
 std::map<UINT, CClientController::MSGFUNC> CClientController::m_mapFunc;
 CClientController* CClientController::m_instance = NULL;
+CClientController::CHelper CClientController::m_helper;
 
 CClientController* CClientController::getInstance()
 {
 	if (m_instance == NULL) {
 		m_instance = new CClientController();
+		TRACE("CClientController size is %d\r\n", sizeof(*m_instance));
 		//函数映射表
 		struct { UINT nMsg; MSGFUNC func; }MsgFuncs[] =
 		{ 
@@ -22,7 +24,7 @@ CClientController* CClientController::getInstance()
 			m_mapFunc.insert(std::pair < UINT, MSGFUNC >(MsgFuncs[i].nMsg,MsgFuncs[i].func));
 		}
 	}
-	return nullptr;
+	return m_instance;
 }
 
 int CClientController::InitController()
@@ -60,12 +62,58 @@ LRESULT CClientController::SendMessage(MSG msg)
 	return info.result;//返回处理结果
 }
 
+int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength)
+{
+	CClientSocket* pClient = CClientSocket::getInstance();
+	if (pClient->InitSocket() == false)
+		return false;
+	pClient->Send(CPacket(nCmd, pData, nLength));
+	int cmd = DealCommand();
+	TRACE("ack:%d\r\n", cmd);
+	if (bAutoClose) {
+		CloseSocket();
+	}
+	return cmd;
+	
+
+}
+
+int CClientController::DownFile(CString strPath)
+{
+	{
+		CFileDialog dlg(FALSE, NULL,
+			strPath,
+			OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+			NULL, &m_remoteDlg);
+		//以模态方式显示对话框。如果用户点击“保存”按钮（通常响应为 IDOK）
+		// 则 DoModal 方法会返回 IDOK，代码将进入到 if 语句块内执行
+		if (dlg.DoModal() == IDOK) {
+			m_strRemote = strPath;
+			m_strLocal = dlg.GetPathName();
+			m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+			//1 作为线程入口点，这个函数将在新线程中执行
+			//2 0是初始线程堆栈大小的参数。数值0表示使用默认的大小
+			//3 传递给线程的参数。在这种情况下，this 指针指向当前正在执行 _beginthread 调用的类实例 CRemoteClientDlg 对象。
+
+			if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
+				return -1;
+			}
+			m_remoteDlg.BeginWaitCursor();
+			m_statusDlg.m_info.SetWindowText(_T("命令正在执行中"));//SetWindowText 方法用于设置 m_info 控件的文本内容。在这里，它被设置为显示 "命令正在执行中"
+			m_statusDlg.ShowWindow(SW_SHOW);
+			m_statusDlg.CenterWindow(&m_remoteDlg);
+			m_statusDlg.SetActiveWindow();//使 m_dlgStatus 对话框成为当前活动窗口,将对话框带到屏幕的最前端
+		}
+		return 0;
+	}
+}
+
 void CClientController::StartWatchScreen()
 {
 	m_isClosed = false;
-	CWatchDialog dlg(&m_remoteDlg);
+	m_watchDlg.SetParent(&m_remoteDlg);
 	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::threadWatchScreen, 0, this);
-	dlg.DoModal();
+	//m_watchDlg.DoModal();
 	m_isClosed = true;
 	WaitForSingleObject(m_hThreadWatch, 500);//同步函数，用来等待 _beginthread 创建的线程完成。如果线程在500毫秒内结束，函数会返回；如果线程没有在指定时间内结束，函数也会返回，不会无限期地等待
 }
@@ -74,12 +122,12 @@ void CClientController::threadWatchScreen()
 {
 	Sleep(50);
 	while (!m_isClosed) {
-		if (m_remoteDlg.isFull()==false) {
+		if (m_watchDlg.isFull()==false) {
 			int ret = SendCommandPacket(6);
 			if (ret == 6) {
 				CImage image;
 				if (GetImage(m_remoteDlg.GetImage()) == 0) {
-					m_remoteDlg.SetImageStatus(true);
+					m_watchDlg.SetImageStatus(true);
 				}
 				else {
 					TRACE("获取图片失败 ret = %d\r\n",ret);
