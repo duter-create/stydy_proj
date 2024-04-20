@@ -14,8 +14,8 @@ CClientController* CClientController::getInstance()
 		//函数映射表
 		struct { UINT nMsg; MSGFUNC func; }MsgFuncs[] =
 		{ 
-			{WM_SEND_PACK,&CClientController::OnSendPack},
-			{WM_SEND_DATA,&CClientController::OnSendData},
+			//{WM_SEND_PACK,&CClientController::OnSendPack},
+			//{WM_SEND_DATA,&CClientController::OnSendData},
 			{WM_SHOW_STATUS,&CClientController::OnShowStatus},
 			{WM_SHOW_WATCH,&CClientController::OnShowWatch},
 			{(UINT) - 1,NULL}//数组终止符
@@ -62,50 +62,47 @@ LRESULT CClientController::SendMessage(MSG msg)
 	return info.result;//返回处理结果
 }
 
-int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength)
+int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* plstPacks)
 {
 	CClientSocket* pClient = CClientSocket::getInstance();
-	if (pClient->InitSocket() == false)
-		return false;
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	//不应该直接发送，应该投入队列
-	pClient->Send(CPacket(nCmd, pData, nLength,hEvent));
-	int cmd = DealCommand();
-	TRACE("ack:%d\r\n", cmd);
-	if (bAutoClose) {
-		CloseSocket();
+	std::list<CPacket> lstPacks;//应答结果包
+	if (plstPacks == NULL)
+		plstPacks = &lstPacks;
+	pClient->SendPacket(CPacket(nCmd, pData, nLength,hEvent),*plstPacks);//预期在plstPacks链表中填充响应数据包（如果有的话
+	if (plstPacks->size() > 0) {
+			return plstPacks->front().sCmd;
 	}
-	return cmd;
+	return -1;
 }
 
 int CClientController::DownFile(CString strPath)
 {
-	{
-		CFileDialog dlg(FALSE, NULL,
-			strPath,
-			OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-			NULL, &m_remoteDlg);
-		//以模态方式显示对话框。如果用户点击“保存”按钮（通常响应为 IDOK）
-		// 则 DoModal 方法会返回 IDOK，代码将进入到 if 语句块内执行
-		if (dlg.DoModal() == IDOK) {
-			m_strRemote = strPath;
-			m_strLocal = dlg.GetPathName();
-			m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
-			//1 作为线程入口点，这个函数将在新线程中执行
-			//2 0是初始线程堆栈大小的参数。数值0表示使用默认的大小
-			//3 传递给线程的参数。在这种情况下，this 指针指向当前正在执行 _beginthread 调用的类实例 CRemoteClientDlg 对象。
+	CFileDialog dlg(FALSE, NULL,
+		strPath,
+		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+		NULL, &m_remoteDlg);
+	//以模态方式显示对话框。如果用户点击“保存”按钮（通常响应为 IDOK）
+	// 则 DoModal 方法会返回 IDOK，代码将进入到 if 语句块内执行
+	if (dlg.DoModal() == IDOK) {
+		m_strRemote = strPath;
+		m_strLocal = dlg.GetPathName();
+		m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+		//1 作为线程入口点，这个函数将在新线程中执行
+		//2 0是初始线程堆栈大小的参数。数值0表示使用默认的大小
+		//3 传递给线程的参数。在这种情况下，this 指针指向当前正在执行 _beginthread 调用的类实例 CRemoteClientDlg 对象。
 
-			if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
-				return -1;
-			}
-			m_remoteDlg.BeginWaitCursor();
-			m_statusDlg.m_info.SetWindowText(_T("命令正在执行中"));//SetWindowText 方法用于设置 m_info 控件的文本内容。在这里，它被设置为显示 "命令正在执行中"
-			m_statusDlg.ShowWindow(SW_SHOW);
-			m_statusDlg.CenterWindow(&m_remoteDlg);
-			m_statusDlg.SetActiveWindow();//使 m_dlgStatus 对话框成为当前活动窗口,将对话框带到屏幕的最前端
+		if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
+			return -1;
 		}
-		return 0;
+		m_remoteDlg.BeginWaitCursor();
+		m_statusDlg.m_info.SetWindowText(_T("命令正在执行中"));//SetWindowText 方法用于设置 m_info 控件的文本内容。在这里，它被设置为显示 "命令正在执行中"
+		m_statusDlg.ShowWindow(SW_SHOW);
+		m_statusDlg.CenterWindow(&m_remoteDlg);
+		m_statusDlg.SetActiveWindow();//使 m_dlgStatus 对话框成为当前活动窗口,将对话框带到屏幕的最前端
 	}
+	return 0;
 }
 
 void CClientController::StartWatchScreen()
@@ -123,10 +120,10 @@ void CClientController::threadWatchScreen()
 	Sleep(50);
 	while (!m_isClosed) {
 		if (m_watchDlg.isFull()==false) {
-			int ret = SendCommandPacket(6);
+			std::list<CPacket> lstPacks;
+			int ret = SendCommandPacket(6,true,NULL,0,&lstPacks);
 			if (ret == 6) {
-				CImage image;
-				if (GetImage(m_remoteDlg.GetImage()) == 0) {
+				if (ClassTool::Bytes2Image(m_remoteDlg.GetImage(), lstPacks.front().strData) == 0) {
 					m_watchDlg.SetImageStatus(true);
 				}
 				else {
@@ -225,19 +222,23 @@ unsigned __stdcall CClientController::threadEntry(void* arg)
 	return 0;
 }
 
+/*
 LRESULT CClientController::OnSendPack(UINT nMsg, WPARAM wParam, LPARAM lPARAM)
 {
 	CClientSocket* pClient = CClientSocket::getInstance();
 	CPacket* pPacket = (CPacket*)wParam;
 	return pClient->Send(*pPacket);
 }
+*/
 
+/*
 LRESULT CClientController::OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam)
 { 
 	CClientSocket* pClient = CClientSocket::getInstance();
 	char* pBuffer = (char*)wParam;//要发送数据的缓冲区的指针
 	return pClient->Send(pBuffer,(int)lParam);//要发送的数据的大小或长度
 }
+*/
 
 LRESULT CClientController::OnShowStatus(UINT nMsg, WPARAM wParam, LPARAM lPARAM)
 {
