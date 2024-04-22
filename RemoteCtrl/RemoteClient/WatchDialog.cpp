@@ -94,21 +94,17 @@ void CWatchDialog::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == 0) {//判断传入的定时器ID是否为0。在MFC中，可以使用多个定时器，每个定时器有一个唯一的ID。
 		CClientController* pParent = CClientController::getInstance();//获取父窗口，以访问public成员和函数（私有成员用公有函数当接口调用）
 		if (m_isFull) {//父窗口缓冲区是否为空
+
 			CRect rect;
 			m_picture.GetWindowRect(rect);//获取窗口区域
-			CImage image;
-			pParent->GetImage(image);
-			if (m_nObjWidth == -1) {
-				m_nObjWidth = image.GetWidth();
-			}
-			if (m_nObjHeight == -1) {
-				m_nObjHeight = image.GetHeight();
-			}
-			image.StretchBlt(
+			m_nObjWidth = m_image.GetWidth();
+			m_nObjHeight = m_image.GetHeight();
+			m_image.StretchBlt(
 				m_picture.GetDC()->GetSafeHdc(), 0, 0,rect.Width(),rect.Height(), SRCCOPY);//绘图
 			m_picture.InvalidateRect(NULL);//重新绘制，即刷新界面
-			image.Destroy();
+			m_image.Destroy();
 			m_isFull = false;
+			TRACE("更新图片完成%d %d\r\n", m_nObjWidth, m_nObjHeight);
 		}
 	}
 	CDialog::OnTimer(nIDEvent);

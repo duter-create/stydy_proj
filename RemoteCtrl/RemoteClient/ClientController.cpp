@@ -58,12 +58,14 @@ LRESULT CClientController::SendMessage(MSG msg)
 	MSGINFO info(msg);
 	//将一个消息发送到属于另一个线程的消息队列中
 	PostThreadMessage(m_nThreadID, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)hEvent);
-	WaitForSingleObject(hEvent, -1);
+	WaitForSingleObject(hEvent, INFINITE);
+	CloseHandle(hEvent);//等待事件对象被设置为信号状态，即等待另一个线程处理完消息。这里使用了INFINITE参数，意味着会无限等待直到消息被处理。
 	return info.result;//返回处理结果
 }
 
 int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* plstPacks)
 {
+	TRACE("cmd:%d %s start %lld \r\n",nCmd,__FUNCTION__,GetTickCount64());
 	CClientSocket* pClient = CClientSocket::getInstance();
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	//不应该直接发送，应该投入队列
@@ -71,9 +73,12 @@ int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData,
 	if (plstPacks == NULL)
 		plstPacks = &lstPacks;
 	pClient->SendPacket(CPacket(nCmd, pData, nLength,hEvent),*plstPacks);//预期在plstPacks链表中填充响应数据包（如果有的话
+	CloseHandle(hEvent);//回收事件句柄，防止资源耗尽
 	if (plstPacks->size() > 0) {
-			return plstPacks->front().sCmd;
+		TRACE("%s start %lld \r\n", __FUNCTION__, GetTickCount64());
+		return plstPacks->front().sCmd;
 	}
+	TRACE("%s start %lld \r\n", __FUNCTION__, GetTickCount64());
 	return -1;
 }
 
@@ -108,9 +113,9 @@ int CClientController::DownFile(CString strPath)
 void CClientController::StartWatchScreen()
 {
 	m_isClosed = false;
-	m_watchDlg.SetParent(&m_remoteDlg);
+	//m_watchDlg.SetParent(&m_remoteDlg);
 	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::threadWatchScreen, 0, this);
-	//m_watchDlg.DoModal();
+	m_watchDlg.DoModal();
 	m_isClosed = true;
 	WaitForSingleObject(m_hThreadWatch, 500);//同步函数，用来等待 _beginthread 创建的线程完成。如果线程在500毫秒内结束，函数会返回；如果线程没有在指定时间内结束，函数也会返回，不会无限期地等待
 }
@@ -123,8 +128,9 @@ void CClientController::threadWatchScreen()
 			std::list<CPacket> lstPacks;
 			int ret = SendCommandPacket(6,true,NULL,0,&lstPacks);
 			if (ret == 6) {
-				if (ClassTool::Bytes2Image(m_remoteDlg.GetImage(), lstPacks.front().strData) == 0) {
+				if (ClassTool::Bytes2Image(m_watchDlg.GetImage(), lstPacks.front().strData) == 0) {
 					m_watchDlg.SetImageStatus(true);
+					TRACE("成功设置图片\r\n");
 				}
 				else {
 					TRACE("获取图片失败 ret = %d\r\n",ret);

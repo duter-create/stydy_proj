@@ -1,8 +1,1 @@
-﻿  pch.cpp
-  ClassTool.cpp
-  Command.cpp
-  LockDialog.cpp
-  RemoteCtrl.cpp
-  ServerSocket.cpp
-  正在生成代码...
-E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\LockDialog.cpp(1,1): error C1090: PDB API 调用失败，错误代码“3”: E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\Debug\vc143.pdb
+﻿

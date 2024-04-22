@@ -19,12 +19,16 @@ public:
 public:
 	int m_nObjWidth;//n表示整数，后面是驼峰命名法
 	int m_nObjHeight;
+	CImage m_image;
 protected:
 	bool m_isFull;//缓存是否有数据，true表示有缓存，false表示没有缓存数据,初始化时设置false
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 	DECLARE_MESSAGE_MAP()
 public:
+	CImage& GetImage() {
+		return m_image;
+	}
 	void SetImageStatus(bool isFull = false) {
 		m_isFull = isFull;
 	}
