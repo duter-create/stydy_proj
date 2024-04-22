@@ -5,6 +5,7 @@
 #include <vector>
 #include <list>
 #include <map>
+#include <mutex>
 
 #pragma pack(push)
 #pragma pack(1)//告诉编译器将每个成员变量的对齐设为1字节
@@ -154,32 +155,9 @@ public:
 	//GetErrorInfo 函数用于将 Windows Sockets API（Winsock）返回的错误代码转换成错误消息字符串
 	std::string GetErrorInfo(int wsaErrCode);
 
-	bool InitSocket() {
-		if (m_sock != INVALID_SOCKET)
-			CloseSocket();
-		m_sock = socket(PF_INET, SOCK_STREAM, 0);
-		if (m_sock == -1)return false;
-		sockaddr_in serv_adr;
-		memset(&serv_adr, 0, sizeof(serv_adr));
-		serv_adr.sin_family = AF_INET;
-		TRACE("addr %08X nIP %08X\r\n", inet_addr("127.0.0.1"), m_nIP);
-		serv_adr.sin_addr.s_addr = inet_addr("127.0.0.1");
-		serv_adr.sin_addr.s_addr = htonl(m_nIP);
-		serv_adr.sin_port = htons(m_nPort);
-		if (serv_adr.sin_addr.s_addr == INADDR_NONE) {
-			AfxMessageBox("指定的IP地址，不存在");
-			return false;
-		}
-		int ret = connect(m_sock, (sockaddr*)&serv_adr, sizeof(serv_adr));
-		if (ret == -1) {
-			AfxMessageBox("连接失败!");
-			TRACE("连接失败：%d%s\r\n", WSAGetLastError(), GetErrorInfo(WSAGetLastError()).c_str());
-			return false;
-		}
-		return true;
-	}
-	
-#define BUFFER_SIZE 4096000
+	bool InitSocket();
+		
+#define BUFFER_SIZE 40960000
 	int  DealCommand() {//处理接收到的网络命令.返回packet中的cmd
 		//1 检查套接字有效性 2 准备缓冲区 3 接收网络数据 4 检查接受结果 5 用buffer中的数据构建数据包对象 6 返回packet数据包中的cmd字段
 		if (m_sock == -1)
@@ -236,6 +214,8 @@ public:
 		}
 	}
 private:
+	HANDLE m_hThread;
+	std::mutex m_lock;
 	bool m_bAutoClose;
 	std::list<CPacket> m_lstSend;
 	std::map<HANDLE, std::list<CPacket>&> m_mapAck;
@@ -254,8 +234,8 @@ private:
 		m_bAutoClose = ss.m_bAutoClose;
 	}
 	CClientSocket():
-		m_nIP(INADDR_ANY), m_nPort(0),m_sock(INVALID_SOCKET),m_bAutoClose(true)
-	{
+		m_nIP(INADDR_ANY), m_nPort(0),m_sock(INVALID_SOCKET),m_bAutoClose(true),m_hThread(INVALID_HANDLE_VALUE)
+{
 		if (InitSockEnv() == FALSE) {
 			MessageBox(NULL, _T("无法初始化套接字环境,请检查网络设置"), _T("初始化错误"), MB_OK | MB_ICONERROR);
 			exit(0);
