@@ -1,1 +1,8 @@
-﻿
+﻿  pch.cpp
+  ClassTool.cpp
+  Command.cpp
+  LockDialog.cpp
+  RemoteCtrl.cpp
+  ServerSocket.cpp
+  正在生成代码...
+  RemoteCtrl.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteCtrl.exe

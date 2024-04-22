@@ -63,7 +63,8 @@ LRESULT CClientController::SendMessage(MSG msg)
 	return info.result;//返回处理结果
 }
 
-int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* plstPacks)
+int CClientController::SendCommandPacket
+(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* plstPacks)
 {
 	TRACE("cmd:%d %s start %lld \r\n",nCmd,__FUNCTION__,GetTickCount64());
 	CClientSocket* pClient = CClientSocket::getInstance();
@@ -72,7 +73,7 @@ int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData,
 	std::list<CPacket> lstPacks;//应答结果包
 	if (plstPacks == NULL)
 		plstPacks = &lstPacks;
-	pClient->SendPacket(CPacket(nCmd, pData, nLength,hEvent),*plstPacks);//预期在plstPacks链表中填充响应数据包（如果有的话
+	pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), *plstPacks, bAutoClose);//预期在plstPacks链表中填充响应数据包（如果有的话
 	CloseHandle(hEvent);//回收事件句柄，防止资源耗尽
 	if (plstPacks->size() > 0) {
 		TRACE("%s start %lld \r\n", __FUNCTION__, GetTickCount64());

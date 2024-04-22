@@ -206,13 +206,15 @@ void CRemoteClientDlg::OnEnChangeEdit1()
 
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {//更新一个树视图控件来显示这些磁盘分区
-	int ret = CClientController::getInstance()->SendCommandPacket(1);//查看磁盘分区
-	if (ret == -1) {
+	std::list<CPacket> lstPackets;
+	int ret = CClientController::getInstance()->SendCommandPacket
+	(1,true,NULL,0,&lstPackets);//查看磁盘分区
+	if (ret == -1 || (lstPackets.size()<=0)) {
 		AfxMessageBox(_T("命令处理失败!!!"));
 		return;
 	}
-	CClientSocket* pClient = CClientSocket::getInstance();//获取客户端socket实例
-	std::string drivers = pClient->GetPacket().strData;//拿packet里面的数据
+	CPacket& head = lstPackets.front();
+	std::string drivers = head.strData;//拿packet里面的数据
 	std::string dr;//存储驱动器标识符
 	m_Tree.DeleteAllItems();//将新数据添加到树视图控件 (CTreeCtrl) 之前，先删除所有已存在的项目
 	for (size_t i = 0; i < drivers.size(); i++) {
@@ -270,37 +272,27 @@ void CRemoteClientDlg::LoadFileInfo()
 	DeleteTreeChildrenItem(hTreeSelected);
 	m_List.DeleteAllItems();
 	CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
-	int nCmd = CClientController::getInstance()->SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());//发送一个命令数据包到服务器
-	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();//获取服务器响应数据
-	int Count = 0;
-	while (pInfo->HasNext == TRUE) {
-		TRACE("[%s] isdir %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
-		if (pInfo->IsDirectory) {
-			if (CString(pInfo->szFileName) == "." || (CString(pInfo->szFileName) == "..")) {
-				//不会对 "." 或 ".." 这两个特殊目录项目进行处理，而是跳过它们，并继续处理其他的文件或目录项
-				int cmd = CClientController::getInstance()->DealCommand();
-				TRACE("ack:%d\r\n", cmd);//打印接收到的响应命令
-				if (cmd < 0)
-					break;
-				pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
+	std::list<CPacket> lstPackets;
+	int nCmd = CClientController::getInstance()->SendCommandPacket
+	(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(),&lstPackets);//发送命令数据包到服务器
+	if (lstPackets.size() > 0) {
+		std::list<CPacket>::iterator it = lstPackets.begin();
+		for (; it != lstPackets.end(); it++) {
+			PFILEINFO pInfo = (PFILEINFO)(*it).strData.c_str();
+			if (pInfo->HasNext == FALSE)
 				continue;
+			if (pInfo->IsDirectory) {
+				if (CString(pInfo->szFileName) == "." || (CString(pInfo->szFileName) == "..")) {
+					continue;
+				}
+				HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, hTreeSelected, TVI_LAST);
+				m_Tree.InsertItem("", hTemp, TVI_LAST);
 			}
-			HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, hTreeSelected, TVI_LAST);
-			m_Tree.InsertItem("", hTemp, TVI_LAST);
+			else {
+				m_List.InsertItem(0, pInfo->szFileName);
+			}
 		}
-		else {
-			m_List.InsertItem(0, pInfo->szFileName);
-		}
-		Count++;
-		int cmd = CClientController::getInstance()->DealCommand();
- 		TRACE("ack:%d\r\n", cmd);//打印接收到的响应命令
-		if (cmd < 0)
-			break;
-		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
-
-	//CClientController::getInstance()->CloseSocket();
-	TRACE("Client: Count = %d\r\n", Count);
 }
 
 void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
