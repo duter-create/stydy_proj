@@ -189,7 +189,7 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {//发一个1981的cmd测试
-	CClientController::getInstance()->SendCommandPacket(1981);
+	CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 1981);
 }
 
 
@@ -208,7 +208,7 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {//更新一个树视图控件来显示这些磁盘分区
 	std::list<CPacket> lstPackets;
 	int ret = CClientController::getInstance()->SendCommandPacket
-	(1,true,NULL,0,&lstPackets);//查看磁盘分区
+	(GetSafeHwnd(), 1,true,NULL,0);//查看磁盘分区
 	if (ret == -1 || (lstPackets.size()<=0)) {
 		AfxMessageBox(_T("命令处理失败!!!"));
 		return;
@@ -238,7 +238,7 @@ void CRemoteClientDlg::LoadFileCurrent()
 	CString strPath = GetPath(hTree);
 	m_List.DeleteAllItems();//清空列表控件中所有的条目，准备添加新的文件信息。
 	//CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
-	int nCmd = CClientController::getInstance()->SendCommandPacket(2, 
+	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 2,
 		false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());//发送一个命令数据包到服务器
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();//获取服务器响应数据
 	while (pInfo->HasNext == TRUE) {
@@ -274,7 +274,7 @@ void CRemoteClientDlg::LoadFileInfo()
 	CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
 	std::list<CPacket> lstPackets;
 	int nCmd = CClientController::getInstance()->SendCommandPacket
-	(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(),&lstPackets);//发送命令数据包到服务器
+	(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());//发送命令数据包到服务器
 	if (lstPackets.size() > 0) {
 		TRACE("lstPackets.size = %d\r\n", lstPackets.size());
 		std::list<CPacket>::iterator it = lstPackets.begin();
@@ -372,7 +372,7 @@ void CRemoteClientDlg::OnDeleteFile()
 	int nSelected = m_List.GetSelectionMark();//从列表视图控件 m_List 中获取当前选中项的索引
 	CString strFile = m_List.GetItemText(nSelected, 0);//根据索引拿文本，0 表明我们想要获取当前选中项的第一列的内容
 	strFile = strPath + strFile;
-	int ret = CClientController::getInstance()->SendCommandPacket(9, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	int ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 9, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 	if (ret < 0) {
 		AfxMessageBox("删除文件命令执行失败");
 	}
@@ -387,7 +387,7 @@ void CRemoteClientDlg::OnRunFile()
 	int nSelected = m_List.GetSelectionMark();//从列表视图控件 m_List 中获取当前选中项的索引
 	CString strFile = m_List.GetItemText(nSelected, 0);//根据索引拿文本，0 表明我们想要获取当前选中项的第一列的内容
 	strFile = strPath + strFile;
-	int ret = CClientController::getInstance()->SendCommandPacket(3, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
+	int ret = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 3, true, (BYTE*)(LPCSTR)strFile, strFile.GetLength());
 	if (ret < 0) {
 		AfxMessageBox("打开文件命令执行失败");
 	}
