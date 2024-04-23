@@ -124,14 +124,20 @@ void CClientSocket::threadFunc()
 					}
 					else if (length <= 0 && index <= 0) {
 						CloseSocket();
-						SetEvent(head.hEvent);//等到服务器关闭命令之后在通知事情完成
-						m_mapAutoClosed.erase(it0);
+						SetEvent(head.hEvent);//等到服务器关闭命令之后,在通知事情完成
+						if (it0 != m_mapAutoClosed.end()) {
+							TRACE("SetEvent %d %d\r\n", head.sCmd, it0->second);
+						}
+						else {
+							TRACE("异常的情况，没有对应的pair\r\n");
+						}
 						break;
 					}
 				} while (it0->second == false || index >0);
 			}
 			m_lock.lock();
 			m_lstSend.pop_front();
+			m_mapAutoClosed.erase(head.hEvent);
 			m_lock.unlock();
 			if (InitSocket() == false) {
 				InitSocket(); 
@@ -142,6 +148,21 @@ void CClientSocket::threadFunc()
 	CloseSocket();
 }
 
+void CClientSocket::threadFunc2()
+{
+	MSG msg;
+	while (::GetMessage(&msg, NULL, 0, 0)) {//::表示全局作用域
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		//检查msg.message是否存在于m_mapFunc映射中
+		//如果存在，就使用存储在映射中的函数指针来调用适当的成员函数，并将消息的三个关键成分作为参数传递给该函数
+		if (m_mapFunc.find(msg.message) != m_mapFunc.end()) {
+			(this->*m_mapFunc[msg.message])(msg.message,msg.wParam,msg.lParam);
+
+		}
+	}
+}
+
 bool CClientSocket::Send(const CPacket& pack)
 {
 	TRACE("m_sock = %d\r\n", m_sock);
@@ -149,6 +170,23 @@ bool CClientSocket::Send(const CPacket& pack)
 	std::string strOut;
 	pack.Data(strOut);
 	return (send(m_sock, strOut.c_str(), strOut.size(), 0)) > 0;
+}
+
+void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
+{//TODO:定义一个消息的数据结构(数据和数据长度，模式) 回调消息的数据结构（HWND MESSAGE）
+	if (InitSocket() == true) {
+		int ret = send(m_sock, (char*)wParam, (int)lParam, 0);
+		if (ret > 0) {
+
+		}
+		else {
+			CloseSocket();
+			//网络终止
+		}
+	}
+	else {
+		//TODO:错误处理
+	}
 }
 
 void Dump(BYTE* pData, size_t nSize)//将提供的字节数组（BYTE* pData）转储成一个十六进制字符串，并通过 OutputDebugStringA 输出调试信息

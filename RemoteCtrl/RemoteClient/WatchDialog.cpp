@@ -56,12 +56,12 @@ CPoint CWatchDialog::UserPoint2RemoteScreenPoint(CPoint& point, bool isScreen)
 	//(800*450)
 	//CPoint cur = point;
 	CRect clientRect;
-	if (isScreen)
-		ScreenToClient(&point);//全局坐标到客户区域坐标
+	if (!isScreen)
+		ClientToScreen(&point);//转换为相对屏幕左上角的坐标（屏幕内的绝对坐标）
+		m_picture.ScreenToClient(&point);//全局坐标到客户区域坐标
 	TRACE("x=%d y=%d\r\n", point.x, point.y);
 	//客户端坐标，到远程坐标
 	m_picture.GetWindowRect(clientRect);
-
 	//客户端坐标
 	int width0 = clientRect.Width();
 	int height0 = clientRect.Height();
@@ -82,7 +82,7 @@ BOOL CWatchDialog::OnInitDialog()
 
 	// TODO:  在此添加额外的初始化
 	m_isFull = false;
-	SetTimer(0, 45, NULL);//50ms一次，不需要回调函数
+	SetTimer(0, 40, NULL);//50ms一次，不需要回调函数
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// 异常: OCX 属性页应返回 FALSE

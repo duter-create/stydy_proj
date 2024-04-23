@@ -6,7 +6,7 @@
 #include <list>
 #include <map>
 #include <mutex>
-
+#define WM_SEND_PACK (WM_USER+1)//发送包数据
 #pragma pack(push)
 #pragma pack(1)//告诉编译器将每个成员变量的对齐设为1字节
 
@@ -214,6 +214,8 @@ public:
 		}
 	}
 private:
+	typedef void(CClientSocket::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lPARAM);
+	std::map<UINT, MSGFUNC> m_mapFunc;
 	HANDLE m_hThread;
 	std::mutex m_lock;
 	bool m_bAutoClose;
@@ -228,10 +230,26 @@ private:
 	CClientSocket& operator=(const CClientSocket& ss) {}
 	CClientSocket(const CClientSocket& ss)
 	{
+		m_hThread = INVALID_HANDLE_VALUE;
 		m_sock = ss.m_sock;
 		m_nIP = ss.m_nIP;
 		m_nPort = ss.m_nPort;
 		m_bAutoClose = ss.m_bAutoClose;
+		struct {
+			UINT message;
+			MSGFUNC func;
+		}funcs[] = {
+			{WM_SEND_PACK,&CClientSocket::SendPack},
+			//{WM_SEND_PACK,},
+			{0,NULL}
+		};
+		for (int i = 0; funcs[i].message != 0; i++) {
+			if (m_mapFunc.insert(std::pair<UINT, MSGFUNC>(funcs[i].message, funcs[i].func)).second == false) {
+				TRACE("插入失败，消息值：%d 函数值：%08X 序号：%d\r\n",funcs[i].message,funcs[i].func,i);
+			}
+		}
+
+
 	}
 	CClientSocket():
 		m_nIP(INADDR_ANY), m_nPort(0),m_sock(INVALID_SOCKET),m_bAutoClose(true),m_hThread(INVALID_HANDLE_VALUE)
@@ -250,6 +268,7 @@ private:
 	}
 	static void threadEntry(void* arg);
 	void threadFunc();
+	void threadFunc2();
 	BOOL InitSockEnv() {//Windows网络编程中的套接字初始化
 		WSADATA data;
 		if (WSAStartup(MAKEWORD(1, 1), &data) != 0) {
@@ -271,6 +290,9 @@ private:
 		return (send(m_sock, pData, nSize, 0)) > 0;
 	}
 	bool Send(const CPacket& pack);
+	//wparam:缓冲区的值
+	//lparam:缓冲区的长度
+	void SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	static CClientSocket* m_instance;
 
 	class CHelper {//在单例模式中管理生命周期，确保单例的实例正确的在程序结束时被销毁
