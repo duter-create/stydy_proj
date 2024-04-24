@@ -64,12 +64,19 @@ LRESULT CClientController::SendMessage(MSG msg)
 }
 
 bool CClientController::SendCommandPacket
-(HWND hWnd,int nCmd, bool bAutoClose, BYTE* pData, size_t nLength)
+(HWND hWnd,int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, WPARAM wParam)
 {
 	TRACE("cmd:%d %s start %lld \r\n",nCmd,__FUNCTION__,GetTickCount64());
 	CClientSocket* pClient = CClientSocket::getInstance();
-	return pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength), bAutoClose);//预期在plstPacks链表中填充响应数据包（如果有的话
+	return pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength), bAutoClose,wParam);//预期在plstPacks链表中填充响应数据包（如果有的话
 	TRACE("%s start %lld \r\n", __FUNCTION__, GetTickCount64());
+}
+
+void CClientController::DownloadEnd()
+{
+	m_statusDlg.ShowWindow(SW_HIDE);
+	m_remoteDlg.EndWaitCursor();
+	m_remoteDlg.MessageBox(_T("下载完成"), _T("完成"));
 }
 
 int CClientController::DownFile(CString strPath)
@@ -83,14 +90,21 @@ int CClientController::DownFile(CString strPath)
 	if (dlg.DoModal() == IDOK) {
 		m_strRemote = strPath;
 		m_strLocal = dlg.GetPathName();
-		m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+		FILE* pFile = fopen(m_strLocal, "wb+");
+		if (pFile == NULL) {
+			AfxMessageBox(_T("本地没有权限保存该文件，或者文件无法创建"));
+			return -1;
+		}
+		SendCommandPacket(m_remoteDlg, 4, false, (BYTE*)(LPCSTR)m_strRemote,
+			m_strRemote.GetLength(), (WPARAM)pFile);
+		//m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
 		//1 作为线程入口点，这个函数将在新线程中执行
 		//2 0是初始线程堆栈大小的参数。数值0表示使用默认的大小
 		//3 传递给线程的参数。在这种情况下，this 指针指向当前正在执行 _beginthread 调用的类实例 CRemoteClientDlg 对象。
 
-		if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
+		/*if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
 			return -1;
-		}
+		}*/
 		m_remoteDlg.BeginWaitCursor();
 		m_statusDlg.m_info.SetWindowText(_T("命令正在执行中"));//SetWindowText 方法用于设置 m_info 控件的文本内容。在这里，它被设置为显示 "命令正在执行中"
 		m_statusDlg.ShowWindow(SW_SHOW);
@@ -156,7 +170,7 @@ void CClientController::threadDownloadFile()
 	CClientSocket* pClient = CClientSocket::getInstance();
 	do {
 		int ret = SendCommandPacket(m_remoteDlg,4, false, (BYTE*)(LPCSTR)m_strRemote,
-			m_strRemote.GetLength());
+			m_strRemote.GetLength(),(WPARAM)pFile);
 		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
 		if (nLength == 0) {
 			AfxMessageBox("文件长度为0或者无法读取文件");

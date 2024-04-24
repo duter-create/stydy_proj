@@ -88,6 +88,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	//&CRemoteClientDlg::OnSendPacket是用来处理这个消息的函数。这个函数必须是声明在接收处理消息的类（在这里是 CRemoteClientDlg）内的成员函数。
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_WM_TIMER()
+	ON_MESSAGE(WM_SEND_PACK_ACK, &CRemoteClientDlg::OnSendPacketAck)
 END_MESSAGE_MAP()
 
 
@@ -209,26 +210,9 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 	std::list<CPacket> lstPackets;
 	int ret = CClientController::getInstance()->SendCommandPacket
 	(GetSafeHwnd(), 1,true,NULL,0);//查看磁盘分区
-	if (ret == -1 || (lstPackets.size()<=0)) {
+	if (ret == 0 ) {
 		AfxMessageBox(_T("命令处理失败!!!"));
 		return;
-	}
-	CPacket& head = lstPackets.front();
-	std::string drivers = head.strData;//拿packet里面的数据
-	std::string dr;//存储驱动器标识符
-	m_Tree.DeleteAllItems();//将新数据添加到树视图控件 (CTreeCtrl) 之前，先删除所有已存在的项目
-	for (size_t i = 0; i < drivers.size(); i++) {
-		//if (drivers[i] == 'C' || drivers[i] == 'E') {
-		if (isalpha(drivers[i]) && isupper(drivers[i])){
-			dr += drivers[i];
-			dr += ":";
-			HTREEITEM hTemp = m_Tree.InsertItem(dr.c_str(),TVI_ROOT,TVI_LAST);//TVI_ROOT: 加在树视图的根节点下面,TVI_LAST: 插入在根节点子项的最后一个
-			//hTemp：新插入项的句柄   dr.c_str():传递添加新项的文本标签
-
-			m_Tree.InsertItem("", hTemp, TVI_LAST);//添加一个空文本的子项到hTemp所引用的父项下，供后续可能的内容填充
-			dr.clear();
-			continue;
-		}	
 	}
 }
 
@@ -274,7 +258,7 @@ void CRemoteClientDlg::LoadFileInfo()
 	CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
 	std::list<CPacket> lstPackets;
 	int nCmd = CClientController::getInstance()->SendCommandPacket
-	(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());//发送命令数据包到服务器
+	(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(),(WPARAM)hTreeSelected);//发送命令数据包到服务器
 	if (lstPackets.size() > 0) {
 		TRACE("lstPackets.size = %d\r\n", lstPackets.size());
 		std::list<CPacket>::iterator it = lstPackets.begin();
@@ -415,6 +399,98 @@ void CRemoteClientDlg::OnTimer(UINT_PTR nIDEvent)
 
 
 	CDialogEx::OnTimer(nIDEvent);
+}
+
+LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParam, LPARAM lParam)
+{
+	if (lParam == -1 || (lParam == -2)) {
+		//TODO:错误处理
+
+	}
+	else if (lParam == 1) {
+		//对方关闭了套接字
+	}
+	else {
+		CPacket* pPacket = (CPacket*)wParam;
+		if (pPacket != NULL) {
+			CPacket& head = *pPacket;
+			switch (pPacket->sCmd) {
+			case 1://获取驱动信息
+			{
+				std::string drivers = head.strData;//拿packet里面的数据
+				std::string dr;//存储驱动器标识符
+				m_Tree.DeleteAllItems();//将新数据添加到树视图控件 (CTreeCtrl) 之前，先删除所有已存在的项目
+				for (size_t i = 0; i < drivers.size(); i++) {
+					//if (drivers[i] == 'C' || drivers[i] == 'E') {
+					if (isalpha(drivers[i]) && isupper(drivers[i])) {
+						dr += drivers[i];
+						dr += ":";
+						HTREEITEM hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);//TVI_ROOT: 加在树视图的根节点下面,TVI_LAST: 插入在根节点子项的最后一个
+						//hTemp：新插入项的句柄   dr.c_str():传递添加新项的文本标签
+
+						m_Tree.InsertItem("", hTemp, TVI_LAST);//添加一个空文本的子项到hTemp所引用的父项下，供后续可能的内容填充
+						dr.clear();
+						continue;
+					}
+				}
+				break;
+			}
+			case 2://获取文件信息
+			{
+				PFILEINFO pInfo = (PFILEINFO)head.strData.c_str();
+				if (pInfo->HasNext == FALSE)
+					break;
+				if (pInfo->IsDirectory) {
+					if (CString(pInfo->szFileName) == "." || (CString(pInfo->szFileName) == "..")) {
+						break;;
+					}
+					HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
+					m_Tree.InsertItem("", hTemp, TVI_LAST);
+				}
+				else {
+					m_List.InsertItem(0, pInfo->szFileName);
+				}
+			}
+			break;
+			case 3:
+				TRACE("run file done!\r\n");
+				break;
+			case 4:
+			{
+				static LONGLONG length = 0, index = 0;
+				if (length == 0) {
+					length = *(long long*)head.strData.c_str();
+					if (length == 0) {
+						AfxMessageBox("文件长度为0或者无法读取文件");
+						CClientController::getInstance()->DownloadEnd();//结束后的对话框提示信息
+					}
+				}
+				else if (length > 0 && index >= length) {//file is already over
+					fclose((FILE*)lParam);
+					length = 0;
+					index = 0;
+					CClientController::getInstance()->DownloadEnd();
+				}
+				else {
+					FILE* pFile = (FILE*)lParam;
+					//返回值是写入了多少字节
+					fwrite(head.strData.c_str(), 1, head.strData.size(), pFile);//1:每次写入的大小
+					index += head.strData.size();
+				}
+			}
+			case 9:
+				TRACE("delete file done!\r\n");
+				break;
+			case 1981:
+				TRACE("test connection success!\r\n");
+				break;
+			default:
+				TRACE("unknown data received! %d\r\n", head.sCmd);
+				break;
+			}			
+		}
+	}
+	return 0;
 }
 
 

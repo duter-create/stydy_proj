@@ -45,6 +45,7 @@ BEGIN_MESSAGE_MAP(CWatchDialog, CDialog)
 	ON_STN_CLICKED(IDC_WATCH, &CWatchDialog::OnStnClickedWatch)
 	ON_BN_CLICKED(IDC_BTN_LOCK, &CWatchDialog::OnBnClickedBtnLock)
 	ON_BN_CLICKED(IDC_BTN_UNLOCK, &CWatchDialog::OnBnClickedBtnUnlock)
+	ON_MESSAGE(WM_SEND_PACK_ACK,&CWatchDialog::OnSendPacketAck)
 END_MESSAGE_MAP()
 
 
@@ -82,7 +83,7 @@ BOOL CWatchDialog::OnInitDialog()
 
 	// TODO:  在此添加额外的初始化
 	m_isFull = false;
-	SetTimer(0, 40, NULL);//50ms一次，不需要回调函数
+	//SetTimer(0, 40, NULL);//50ms一次，不需要回调函数
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// 异常: OCX 属性页应返回 FALSE
@@ -91,23 +92,64 @@ BOOL CWatchDialog::OnInitDialog()
 
 void CWatchDialog::OnTimer(UINT_PTR nIDEvent)
 {//在一个定时器（Timer）事件触发时被调用。定时器事件可以根据设置的时间间隔定期触发，用于执行周期性任务
-	if (nIDEvent == 0) {//判断传入的定时器ID是否为0。在MFC中，可以使用多个定时器，每个定时器有一个唯一的ID。
-		CClientController* pParent = CClientController::getInstance();//获取父窗口，以访问public成员和函数（私有成员用公有函数当接口调用）
-		if (m_isFull) {//父窗口缓冲区是否为空
+	//if (nIDEvent == 0) {//判断传入的定时器ID是否为0。在MFC中，可以使用多个定时器，每个定时器有一个唯一的ID。
+	//	CClientController* pParent = CClientController::getInstance();//获取父窗口，以访问public成员和函数（私有成员用公有函数当接口调用）
+	//	if (m_isFull) {//父窗口缓冲区是否为空
 
-			CRect rect;
-			m_picture.GetWindowRect(rect);//获取窗口区域
-			m_nObjWidth = m_image.GetWidth();
-			m_nObjHeight = m_image.GetHeight();
-			m_image.StretchBlt(
-				m_picture.GetDC()->GetSafeHdc(), 0, 0,rect.Width(),rect.Height(), SRCCOPY);//绘图
-			m_picture.InvalidateRect(NULL);//重新绘制，即刷新界面
-			m_image.Destroy();
-			m_isFull = false;
-			TRACE("更新图片完成%d %d\r\n", m_nObjWidth, m_nObjHeight);
+	//		CRect rect;
+	//		m_picture.GetWindowRect(rect);//获取窗口区域
+	//		m_nObjWidth = m_image.GetWidth();
+	//		m_nObjHeight = m_image.GetHeight();
+	//		m_image.StretchBlt(
+	//			m_picture.GetDC()->GetSafeHdc(), 0, 0,rect.Width(),rect.Height(), SRCCOPY);//绘图
+	//		m_picture.InvalidateRect(NULL);//重新绘制，即刷新界面
+	//		TRACE("更新图片完成%d %d\r\n", m_nObjWidth, m_nObjHeight);
+	//		m_image.Destroy();
+	//		m_isFull = false;
+	//	}
+	//}
+	CDialog::OnTimer(nIDEvent);
+}
+
+LRESULT CWatchDialog::OnSendPacketAck(WPARAM wParam, LPARAM lParam)
+{
+	if (lParam == -1 || (lParam == -2)) {
+	//TODO:错误处理
+
+	}
+	else if (lParam == 1) {
+		//对方关闭了套接字
+	}
+	else {
+		CPacket* pPacket = (CPacket*)wParam;
+		if (pPacket != NULL) {
+			switch (pPacket->sCmd) {
+			case 6:
+			{
+				if (m_isFull == true) {
+					ClassTool::Bytes2Image(m_image, pPacket->strData);
+					CRect rect;
+					m_picture.GetWindowRect(rect);//获取窗口区域
+					m_nObjWidth = m_image.GetWidth();
+					m_nObjHeight = m_image.GetHeight();
+					m_image.StretchBlt(
+						m_picture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);//绘图
+					m_picture.InvalidateRect(NULL);//重新绘制，即刷新界面
+					TRACE("更新图片完成%d %d\r\n", m_nObjWidth, m_nObjHeight);
+					m_image.Destroy();
+					m_isFull = false;
+				}
+				break;
+			}
+			case 5:
+			case 7:
+			case 8:
+			default:
+				break;
+			}
 		}
 	}
-	CDialog::OnTimer(nIDEvent);
+	return 0;
 }
 
 void CWatchDialog::OnLButtonDblClk(UINT nFlags, CPoint point)

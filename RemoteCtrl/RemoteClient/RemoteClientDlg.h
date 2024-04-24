@@ -6,6 +6,9 @@
 #pragma once
 #include "ClientSocket.h"
 #include "StatusDlg.h"
+#ifndef WM_SEND_PACK_ACK
+#define WM_SEND_PACK_ACK (WM_USER+2) //发送包数据应答
+#endif
 
 //#define WM_SEND_PACKET (WM_USER + 1) //第一步，自定义消息的ID
 // CRemoteClientDlg 对话框
@@ -66,6 +69,7 @@ public:
 	//OnSendPacket: 这是函数的名称。按照MFC的命名惯例，消息处理函数的名称通常以 "On" 开头，后跟消息的名称。
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg LRESULT OnSendPacketAck(WPARAM wParam, LPARAM lParam);
 };
 
 
