@@ -68,8 +68,8 @@ bool CClientController::SendCommandPacket
 {
 	TRACE("cmd:%d %s start %lld \r\n",nCmd,__FUNCTION__,GetTickCount64());
 	CClientSocket* pClient = CClientSocket::getInstance();
-	return pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength), bAutoClose,wParam);//预期在plstPacks链表中填充响应数据包（如果有的话
-	TRACE("%s start %lld \r\n", __FUNCTION__, GetTickCount64());
+	bool ret = pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength), bAutoClose,wParam);//预期在plstPacks链表中填充响应数据包（如果有的话
+	return ret;
 }
 
 void CClientController::DownloadEnd()
