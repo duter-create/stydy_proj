@@ -256,28 +256,9 @@ void CRemoteClientDlg::LoadFileInfo()
 	DeleteTreeChildrenItem(hTreeSelected);
 	m_List.DeleteAllItems();
 	CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
-	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::getInstance()->SendCommandPacket
+	TRACE("hTreeSelected %08X\r\n", hTreeSelected);
+	CClientController::getInstance()->SendCommandPacket
 	(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(),(WPARAM)hTreeSelected);//发送命令数据包到服务器
-	if (lstPackets.size() > 0) {
-		TRACE("lstPackets.size = %d\r\n", lstPackets.size());
-		std::list<CPacket>::iterator it = lstPackets.begin();
-		for (; it != lstPackets.end(); it++) {
-			PFILEINFO pInfo = (PFILEINFO)(*it).strData.c_str();
-			if (pInfo->HasNext == FALSE)
-				continue;
-			if (pInfo->IsDirectory) {
-				if (CString(pInfo->szFileName) == "." || (CString(pInfo->szFileName) == "..")) {
-					continue;
-				}
-				HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, hTreeSelected, TVI_LAST);
-				m_Tree.InsertItem("", hTemp, TVI_LAST);
-			}
-			else {
-				m_List.InsertItem(0, pInfo->szFileName);
-			}
-		}
-	}
 }
 
 void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
@@ -346,7 +327,6 @@ void CRemoteClientDlg::OnDownloadFile()
 		MessageBox(_T("下载失败"));
 		TRACE("下载失败 ret = %d\r\n", ret);
 	}
-
 }
 
 void CRemoteClientDlg::OnDeleteFile()
@@ -438,14 +418,17 @@ LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParam, LPARAM lParam)
 			case 2://获取文件信息
 			{
 				PFILEINFO pInfo = (PFILEINFO)head.strData.c_str();
+				TRACE("hasnext %d isdirectory %d %s\r\n", pInfo->HasNext, pInfo->IsDirectory, pInfo->szFileName);
 				if (pInfo->HasNext == FALSE)
 					break;
 				if (pInfo->IsDirectory) {
 					if (CString(pInfo->szFileName) == "." || (CString(pInfo->szFileName) == "..")) {
-						break;;
+						break;
 					}
-					HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
+					TRACE("hselected %08X\r\n", lParam);
+					HTREEITEM hTemp = m_Tree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam);
 					m_Tree.InsertItem("", hTemp, TVI_LAST);
+					m_Tree.Expand((HTREEITEM)lParam, TVE_EXPAND);
 				}
 				else {
 					m_List.InsertItem(0, pInfo->szFileName);
@@ -476,6 +459,13 @@ LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParam, LPARAM lParam)
 					//返回值是写入了多少字节
 					fwrite(head.strData.c_str(), 1, head.strData.size(), pFile);//1:每次写入的大小
 					index += head.strData.size();
+					TRACE("index = %d\r\n", index);
+					if (index >= length) {
+						fclose((FILE*)lParam);
+						length = 0;
+						index = 0;
+						CClientController::getInstance()->DownloadEnd();
+					}
 				}
 			}
 			case 9:
