@@ -68,7 +68,7 @@ bool CClientController::SendCommandPacket
 {
 	TRACE("cmd:%d %s start %lld \r\n",nCmd,__FUNCTION__,GetTickCount64());
 	CClientSocket* pClient = CClientSocket::getInstance();
-	bool ret = pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength), bAutoClose,wParam);//预期在plstPacks链表中填充响应数据包（如果有的话
+	bool ret = pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength), bAutoClose,wParam);
 	return ret;
 }
 
@@ -127,23 +127,21 @@ void CClientController::StartWatchScreen()
 void CClientController::threadWatchScreen()
 {
 	Sleep(50);
+	ULONGLONG nTick = GetTickCount64();//记录当前的系统运行时间。GetTickCount64返回自系统启动以来的毫秒数。
 	while (!m_isClosed) {
 		if (m_watchDlg.isFull()==false) {
-			std::list<CPacket> lstPacks;
+			if (GetTickCount64() - nTick < 200) {
+				Sleep(200 - DWORD(GetTickCount64() - nTick));
+			}
+			nTick = GetTickCount64();
 			int ret = SendCommandPacket(m_watchDlg.GetSafeHwnd(), 6, true, NULL, 0);
 			//TODO:添加消息响应函数WM_SEND_PACK_ACK
 			//TODO：控制发送频率
-			if (ret == 6) {
-				if (ClassTool::Bytes2Image(m_watchDlg.GetImage(), lstPacks.front().strData) == 0) {
-					m_watchDlg.SetImageStatus(true);
-					TRACE("成功设置图片\r\n");
-				}
-				else {
-					TRACE("获取图片失败 ret = %d\r\n",ret);
-				}
+			if (ret == 1) {
+				TRACE("成功发送请求图片命令\r\n");				
 			}
 			else {
-				TRACE("获取图片失败 ret = %d\r\n", ret);
+				TRACE("获取图片失败 ret = %d\r\n",ret);
 			}
 		}
 		Sleep(1);

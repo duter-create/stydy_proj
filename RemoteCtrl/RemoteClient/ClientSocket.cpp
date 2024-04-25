@@ -54,8 +54,11 @@ bool CClientSocket::SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed
 	UINT nMode = isAutoClosed ? CSM_AUTOCLOSE : 0;
 	std::string strOut;
 	pack.Data(strOut);
-	bool ret =  PostThreadMessage(m_nThreadID, WM_SEND_PACK, 
-		(WPARAM)new PACKET_DATA(strOut.c_str(), strOut.size(), nMode,wParam),(LPARAM)hWnd);
+	PACKET_DATA* pData = new PACKET_DATA(strOut.c_str(), strOut.size(), nMode, wParam);
+	bool ret =  PostThreadMessage(m_nThreadID, WM_SEND_PACK, (WPARAM)pData, (LPARAM)hWnd);
+	if (ret == false) {
+		delete pData;//±ÜÃâpostÊ§°ÜºóµÄÄÚ´æÐ¹Â¶
+	}
 	return ret;
 }
 
@@ -265,7 +268,6 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 					::SendMessage(hWnd, WM_SEND_PACK_ACK,NULL, 1);
 				}
 			}
-
 		}
 		else {
 			CloseSocket();
