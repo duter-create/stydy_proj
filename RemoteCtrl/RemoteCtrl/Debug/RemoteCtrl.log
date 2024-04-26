@@ -5,4 +5,4 @@
   RemoteCtrl.cpp
   ServerSocket.cpp
   正在生成代码...
-  RemoteCtrl.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteCtrl.exe
+E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\Command.cpp(1,1): error C1090: PDB API 调用失败，错误代码“3”: E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\Debug\vc143.pdb
