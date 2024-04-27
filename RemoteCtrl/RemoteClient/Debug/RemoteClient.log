@@ -1,7 +1,5 @@
 ﻿  ClientController.cpp
   ClientSocket.cpp
   RemoteClient.cpp
-  RemoteClientDlg.cpp
-  StatusDlg.cpp
   正在生成代码...
-E:\ydyun\study_project\RemoteCtrl\RemoteClient\RemoteClient.cpp(1,1): error C1090: PDB API 调用失败，错误代码“3”: E:\ydyun\study_project\RemoteCtrl\RemoteClient\Debug\vc143.pdb
+  RemoteClient.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteClient.exe
