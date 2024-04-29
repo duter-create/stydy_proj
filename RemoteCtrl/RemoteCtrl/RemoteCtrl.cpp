@@ -23,6 +23,12 @@
 
 CWinApp theApp;
 using namespace std;
+//开机启动的时候，程序的权限是跟随启动用户的
+//如果两者的权限不一致，则会导致程序启动失败
+//开机启动对环境变量有影响，如果依赖dll（动态库），则可能启动失败
+//[复制这些dll到system32下面或者sysWOW64下面]
+//system32下面，多是64位程序，syswow64下面多是32位程序
+//【使用静态库，而非动态库】
 
 void ChooseAutoInvoke() {
     TCHAR wcsSystem[MAX_PATH] = _T("");
