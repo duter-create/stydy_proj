@@ -93,8 +93,8 @@ void ChooseAutoInvoke() {
     strInfo += _T("按下“否”按钮，程序只运行一次，不会再系统内留下任何东西\r\n");
     int ret = MessageBox(NULL, strInfo, _T("警告"), MB_YESNOCANCEL | MB_ICONWARNING | MB_TOPMOST);
     if (ret == IDYES) {
-        //WriteRegisterTable(strPath);
-        WriteStartupDir(strPath);
+        WriteRegisterTable(strPath);
+        //WriteStartupDir(strPath);
     }
     else if (ret == IDCANCEL) {
         ::exit(0);
@@ -110,6 +110,7 @@ void ShowError() {//显示windows系统调用错误
         NULL, GetLastError(),MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPWSTR)&lpMessageBuf, 0, NULL);
     OutputDebugString(lpMessageBuf);//把错误信息发送给调试器
+    MessageBox(NULL, lpMessageBuf, _T("发生错误"), 0);
     LocalFree(lpMessageBuf);//释放缓冲区
 }
 
@@ -134,16 +135,40 @@ bool IsAdmin() {//检查当前进程是否有管理员权限
     return false;
 }
 
+void RunAsAdmin() {
+    HANDLE hToken = NULL;
+    //LOGON32_LOGON_BATCH
+    BOOL ret = LogonUser(L"Administrator", NULL, NULL, LOGON32_LOGON_BATCH, LOGON32_PROVIDER_DEFAULT, &hToken);
+    if (!ret) {
+        ShowError();
+        MessageBox(NULL, _T("登录错误！"), _T("程序错误"), 0);
+        ::exit(0);
+    }
+    OutputDebugString(L"Logon administrator success!\r\n");
+    STARTUPINFO si = { 0 };
+    PROCESS_INFORMATION pi = { 0 };
+    TCHAR sPath[MAX_PATH] = _T("");
+    GetCurrentDirectory(MAX_PATH, sPath);
+    CString strCmd = sPath;
+    strCmd += _T("\\RemoteCtrl.exe");
+
+    //ret = CreateProcessWithTokenW(hToken, LOGON_WITH_PROFILE, NULL, (LPWSTR)(LPCWSTR)strCmd, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi);
+    ret = CreateProcessWithLogonW(_T("Administrator"), NULL, NULL, LOGON_WITH_PROFILE, NULL, (LPWSTR)(LPCWSTR)strCmd, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi);
+    CloseHandle(hToken);
+    if (!ret) {
+        ShowError();
+        MessageBox(NULL, strCmd, _T("创建进程失败"), 0);
+        ::exit(0);
+    }
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+}
+
 int main()
 {
-    if (IsAdmin()) {
-        OutputDebugString(L"current is run as administrator!\r\n");
-    }
-    else {
-        OutputDebugString(L"current is run as normal user!\r\n");
-    }
     int nRetCode = 0;
-
+  
     HMODULE hModule = ::GetModuleHandle(nullptr);
 
     if (hModule != nullptr)
@@ -157,6 +182,17 @@ int main()
         }
         else
         {
+            if (IsAdmin()) {
+                OutputDebugString(L"current is run as administrator!\r\n");
+                MessageBox(NULL, _T("管理员"), _T("用户状态"),0);
+            }
+            else {
+                OutputDebugString(L"current is run as normal user!\r\n");
+                RunAsAdmin();
+                MessageBox(NULL, _T("普通用户"), _T("用户状态"), 0);
+                return nRetCode;
+            }
+
             CCommand cmd;
             ChooseAutoInvoke();
             int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);//服务器创建单例
