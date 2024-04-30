@@ -334,8 +334,7 @@ void CRemoteClientDlg::LoadFileInfo()
 		return;
 	DeleteTreeChildrenItem(hTreeSelected);
 	m_List.DeleteAllItems();
-	CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径
-	TRACE("hTreeSelected %08X\r\n", hTreeSelected);
+	CString strPath = GetPath(hTreeSelected);//获取从选中项到树根的路径TRACE("hTreeSelected %08X\r\n", hTreeSelected);
 	CClientController::getInstance()->SendCommandPacket
 	(GetSafeHwnd(), 2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(),(WPARAM)hTreeSelected);//发送命令数据包到服务器
 }
