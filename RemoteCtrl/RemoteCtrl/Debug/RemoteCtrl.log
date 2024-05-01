@@ -1,8 +1,7 @@
-﻿  pch.cpp
-  ClassTool.cpp
-  Command.cpp
-  LockDialog.cpp
-  RemoteCtrl.cpp
-  ServerSocket.cpp
-  正在生成代码...
+﻿  RemoteCtrl.cpp
+E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\RemoteCtrl.cpp(133,43): warning C4474: printf: 格式字符串中传递的参数太多
+  (编译源文件“/RemoteCtrl.cpp”)
+  E:\ydyun\study_project\RemoteCtrl\RemoteCtrl\RemoteCtrl.cpp(133,43):
+  占位符和其参数预计 0 可变参数，但提供的却是 1 参数
+  
   RemoteCtrl.vcxproj -> E:\ydyun\study_project\RemoteCtrl\Debug\RemoteCtrl.exe

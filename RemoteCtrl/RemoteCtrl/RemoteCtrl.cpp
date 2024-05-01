@@ -67,11 +67,12 @@ typedef struct IocpParam {
     }
 }IOCP_PARAM;
 
-void threadQueueEntry(HANDLE hIOCP) {
+void threadmain(HANDLE hIOCP) {
     std::list<std::string> lstString;
     DWORD dwTransferred = 0;//存储传输的字节数
     ULONG_PTR CompletionKey = 0;//存储完成包的标识
     OVERLAPPED* pOverlapped;//异步（重叠）io操作
+    int count = 0, count0 = 0;
     //在一个无限循环等待IOCP投递的数据
     //根据收到的指令操作一个字符串列表，其中再弹出操作中调用回调函数
     while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE)) {
@@ -82,6 +83,7 @@ void threadQueueEntry(HANDLE hIOCP) {
         IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
         if (pParam->nOperator == IocpListPush) {
             lstString.push_back(pParam->strData);
+            count0++;
         }
         else if (pParam->nOperator == IocpListPop) {
             std::string* pStr = NULL;
@@ -92,13 +94,19 @@ void threadQueueEntry(HANDLE hIOCP) {
             if (pParam->cbFunc) {
                 pParam->cbFunc(pStr);
             }
+            count++;
         }
         else if (pParam->nOperator == IocplISTEmpty) {
             lstString.clear();
         }
         delete pParam;
+        printf("count %d OUnt0 %d\r\n", count, count0);
     }
-    _endthread();
+}
+
+void threadQueueEntry(HANDLE hIOCP) {
+    threadmain(hIOCP);
+    _endthread();//代码到此为止，会导致本地对象无法调用析构，从而导致内存发生泄漏
 }
 
 void func(void* arg) {
@@ -111,7 +119,6 @@ void func(void* arg) {
         printf("list is empty,no data\r\n");
     }
 }
-
 int main()
 {
     if (!ClassTool::Init())
@@ -121,19 +128,24 @@ int main()
     //创建一个 I/O 完成端口。参数 INVALID_HANDLE_VALUE 指示创建一个新的 I/O 完成端口而不是将现有的文件句柄关联到端口。数字 1 表示只使用一个并发线程处理 I/O 完成端口的事件。
     hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);//一个线程处理队列，和rpoll的区别点1 
     //创建了一个新线程，并为它提供了一个线程函数 threadQueueEntry 的入口点和 hIOCP 作为参数
+    if (hIOCP == INVALID_HANDLE_VALUE || hIOCP == NULL) {
+        printf("create iocp failed!\r\n", GetLastError);
+        return 1;
+    }
     HANDLE hThread = (HANDLE)_beginthread(threadQueueEntry,0, hIOCP);
-
     ULONGLONG tick = GetTickCount64();
-    while (_kbhit() != 0) {//定期检查按键是否被按下
+    ULONGLONG tick0 = GetTickCount64();
+    int count = 0, count0 = 0;
+    while (_kbhit() == 0) {//定期检查按键是否被按下
         //完成端口 把请求和实现分离了
         if (GetTickCount64() - tick > 1300) {//读
-            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello world"), NULL);//手动向 I/O 完成端口投递一个完成状态
-            
+            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello world",func), NULL);//手动向 I/O 完成端口投递一个完成状态
+            tick0 = GetTickCount64();
         }
         if (GetTickCount64() - tick > 2000) {//写
             PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello world"), NULL);//手动向 I/O 完成端口投递一个完成状态
-
             tick = GetTickCount64();
+            count0++;
         }
         Sleep(1);
     }
@@ -142,7 +154,7 @@ int main()
         WaitForSingleObject(hIOCP, INFINITE);
     }
     CloseHandle(hIOCP);
-    printf("exit done!\r\n");
+    printf("exit done! count %d count0 %d\r\n",count,count0);
     ::exit(0);
 
     /*
