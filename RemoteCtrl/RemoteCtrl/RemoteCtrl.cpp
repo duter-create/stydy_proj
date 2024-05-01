@@ -5,16 +5,9 @@
 #include "framework.h"
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
-#include <direct.h>
-#include <atlimage.h>
-#include <winbase.h>
-#include "LockDialog.h"
-#include <stdio.h>
-#include <io.h>
-#include <list>
 #include "Command.h"
 #include "ClassTool.h"
-
+#include <conio.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -29,7 +22,7 @@ bool ChooseAutoInvoke(const CString& strPath) {
     TCHAR wcsSystem[MAX_PATH] = _T("");//MAX_PATH表示Windows中表示系统最长路径限制
     // CString strPath = CString(_T("C:\\Windows\\SysWOW64\\RemoteCtrl.exe"));//指向RemoteCtrl.exe可执行文件的路径字符串
     if (PathFileExists(strPath)) {//检查strPath指定的文件是否存在，如果存在则直接退出函数
-        return;
+        return true;
     }
     //定义一个注册表子键路径（一般用于设置程序开机自启动项）
     CString strInfo = _T("该程序只允许用于合法的用途！\r\n");
@@ -50,9 +43,109 @@ bool ChooseAutoInvoke(const CString& strPath) {
     }
     return true;
 }
+#define IOCP_LIST_EMPTY 0//置空
+#define IOCP_LIST_PUSH 1
+#define IOCP_LIST_POP 2
+
+enum {
+    IocplISTEmpty,
+    IocpListPush,
+    IocpListPop
+};
+
+typedef struct IocpParam {
+    int nOperator;//操作
+    std::string strData;//数据
+    _beginthread_proc_type cbFunc;//回调
+    IocpParam(int op, const char* sData, _beginthread_proc_type cb = NULL) {
+        nOperator = op;
+        strData = sData;
+        cbFunc = cb;
+    }
+    IocpParam() {
+        nOperator = -1;
+    }
+}IOCP_PARAM;
+
+void threadQueueEntry(HANDLE hIOCP) {
+    std::list<std::string> lstString;
+    DWORD dwTransferred = 0;//存储传输的字节数
+    ULONG_PTR CompletionKey = 0;//存储完成包的标识
+    OVERLAPPED* pOverlapped;//异步（重叠）io操作
+    //在一个无限循环等待IOCP投递的数据
+    //根据收到的指令操作一个字符串列表，其中再弹出操作中调用回调函数
+    while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE)) {
+        if ((dwTransferred == 0) || (CompletionKey == NULL)) {//没有更多的io操作，终止线程
+            printf("thread is prepare to exit!\r\n");
+            break;
+        }
+        IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
+        if (pParam->nOperator == IocpListPush) {
+            lstString.push_back(pParam->strData);
+        }
+        else if (pParam->nOperator == IocpListPop) {
+            std::string* pStr = NULL;
+            if (lstString.size() > 0) {
+                pStr = new std::string(lstString.front());
+                lstString.pop_front();
+            }
+            if (pParam->cbFunc) {
+                pParam->cbFunc(pStr);
+            }
+        }
+        else if (pParam->nOperator == IocplISTEmpty) {
+            lstString.clear();
+        }
+        delete pParam;
+    }
+    _endthread();
+}
+
+void func(void* arg) {
+    std::string* pstr = (std::string*)arg;
+    if (pstr != NULL) {
+        printf("pop from list:%s\r\n", pstr->c_str());
+        delete pstr;
+    }
+    else {
+        printf("list is empty,no data\r\n");
+    }
+}
 
 int main()
 {
+    if (!ClassTool::Init())
+        return 1;
+    printf("press any key to exit ...\r\n");
+    HANDLE hIOCP = INVALID_HANDLE_VALUE;//Input/Output Completion port IO完成端口
+    //创建一个 I/O 完成端口。参数 INVALID_HANDLE_VALUE 指示创建一个新的 I/O 完成端口而不是将现有的文件句柄关联到端口。数字 1 表示只使用一个并发线程处理 I/O 完成端口的事件。
+    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);//一个线程处理队列，和rpoll的区别点1 
+    //创建了一个新线程，并为它提供了一个线程函数 threadQueueEntry 的入口点和 hIOCP 作为参数
+    HANDLE hThread = (HANDLE)_beginthread(threadQueueEntry,0, hIOCP);
+
+    ULONGLONG tick = GetTickCount64();
+    while (_kbhit() != 0) {//定期检查按键是否被按下
+        //完成端口 把请求和实现分离了
+        if (GetTickCount64() - tick > 1300) {//读
+            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello world"), NULL);//手动向 I/O 完成端口投递一个完成状态
+            
+        }
+        if (GetTickCount64() - tick > 2000) {//写
+            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello world"), NULL);//手动向 I/O 完成端口投递一个完成状态
+
+            tick = GetTickCount64();
+        }
+        Sleep(1);
+    }
+    if (hIOCP != NULL) {
+        PostQueuedCompletionStatus(hIOCP, 0, NULL, NULL);//手动向 I/O 完成端口投递一个完成状态
+        WaitForSingleObject(hIOCP, INFINITE);
+    }
+    CloseHandle(hIOCP);
+    printf("exit done!\r\n");
+    ::exit(0);
+
+    /*
     if (ClassTool::IsAdmin()) {
         if (!ClassTool::Init())
             return 1;
@@ -74,5 +167,6 @@ int main()
             return 1;
         }
     }
+    */
     return 0;
 }    
