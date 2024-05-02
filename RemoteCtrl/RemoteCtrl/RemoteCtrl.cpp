@@ -8,6 +8,7 @@
 #include "Command.h"
 #include "ClassTool.h"
 #include <conio.h>
+#include "CQueue.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -124,37 +125,25 @@ int main()
     if (!ClassTool::Init())
         return 1;
     printf("press any key to exit ...\r\n");
-    HANDLE hIOCP = INVALID_HANDLE_VALUE;//Input/Output Completion port IO完成端口
-    //创建一个 I/O 完成端口。参数 INVALID_HANDLE_VALUE 指示创建一个新的 I/O 完成端口而不是将现有的文件句柄关联到端口。数字 1 表示只使用一个并发线程处理 I/O 完成端口的事件。
-    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);//一个线程处理队列，和rpoll的区别点1 
-    //创建了一个新线程，并为它提供了一个线程函数 threadQueueEntry 的入口点和 hIOCP 作为参数
-    if (hIOCP == INVALID_HANDLE_VALUE || hIOCP == NULL) {
-        printf("create iocp failed!\r\n", GetLastError);
-        return 1;
-    }
-    HANDLE hThread = (HANDLE)_beginthread(threadQueueEntry,0, hIOCP);
-    ULONGLONG tick = GetTickCount64();
-    ULONGLONG tick0 = GetTickCount64();
-    int count = 0, count0 = 0;
+    CQueue <std::string> lstStrings;
+    ULONGLONG tick0 = GetTickCount64(), tick = GetTickCount64();
     while (_kbhit() == 0) {//定期检查按键是否被按下
         //完成端口 把请求和实现分离了
-        if (GetTickCount64() - tick > 1300) {//读
-            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello world",func), NULL);//手动向 I/O 完成端口投递一个完成状态
+        if (GetTickCount64() - tick0 > 1300) {//读
+            lstStrings.PushBack("hello world");
             tick0 = GetTickCount64();
         }
         if (GetTickCount64() - tick > 2000) {//写
-            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello world"), NULL);//手动向 I/O 完成端口投递一个完成状态
-            tick = GetTickCount64();
-            count0++;
+            std::string str;
+            lstStrings.PopFront(str);
+            printf("pop from queue:%s\r\n", str.c_str());
         }
         Sleep(1);
     }
-    if (hIOCP != NULL) {
-        PostQueuedCompletionStatus(hIOCP, 0, NULL, NULL);//手动向 I/O 完成端口投递一个完成状态
-        WaitForSingleObject(hIOCP, INFINITE);
-    }
-    CloseHandle(hIOCP);
-    printf("exit done! count %d count0 %d\r\n",count,count0);
+   
+    printf("exit done! size %d\r\n",lstStrings.Size());
+    lstStrings.Clear();
+    printf("exit done! size %d\r\n", lstStrings.Size());
     ::exit(0);
 
     /*
