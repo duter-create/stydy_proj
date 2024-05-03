@@ -11,7 +11,7 @@ class CQueue
 public:
 	enum {
 		EQNone,
-		EQPush,
+		EQPush, 
 		EQPop,
 		EQSize,
 		EQClear
@@ -34,36 +34,40 @@ public:
 		m_lock = false;
 		m_hCompeletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
 		m_hThread = INVALID_HANDLE_VALUE;
+		//检查iocp是否完成创建，如果完成，启动一个新县城，并将iocp对应的句柄传给他
 		if (m_hCompeletionPort != NULL) {
 			m_hThread = (HANDLE)_beginthread(
 				&CQueue<T>::threadEntry, 
-				0, m_hCompeletionPort);
+				0, this);
 		}
 	}
 	~CQueue() {
-		if (m_lock)
+		if (m_lock)//队列正在析构，直接返回（防御性编程）
 			return;
 		m_lock = true;
-		HANDLE hTemp = m_hCompeletionPort;
+		//投递一个完成状态，无关联操作，告诉线程准备退出
 		PostQueuedCompletionStatus(m_hCompeletionPort, 0, NULL, NULL);
+		//等待已经运行的线程退出
 		WaitForSingleObject(m_hThread, INFINITE);
-		m_hCompeletionPort = NULL;//防御性编程
-		CloseHandle(hTemp);
+		if (m_hCompeletionPort != NULL) {
+			HANDLE hTemp = m_hCompeletionPort;
+			m_hCompeletionPort = NULL;//防御性编程
+			CloseHandle(hTemp);
+		}
 	}
 	bool PushBack(const T& data) {
-		IocpParam* pParam = new IocpParam(EQPush, data);//创建iocpparam示例
-		if (m_lock) {
+		IocpParam* pParam = new IocpParam(EQPush, data);//创建iocpparam示例，此实例包装了待插入的数据和操作类型（push）
+		if (m_lock) {//队列已经析构
 			delete pParam;
 			return false;
 		}
 		bool ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM), 
-			(ULONG_PTR)pParam,NULL);
+			(ULONG_PTR)pParam, NULL);
 		if (ret == false)
 			delete pParam;
 		return ret;
 	}
 	bool PopFront(T& data) {
-
 		HANDLE hEvent = CreateEvent(NULL,TRUE,FALSE,NULL);//用于同步等待pop操作完成
 		IocpParam pParam(EQPop, data,hEvent);
 		if (m_lock) {
@@ -76,7 +80,7 @@ public:
 			CloseHandle(hEvent);
 			return false;
 		}
-		ret = WaitForSingleObject(hEvent, INFINITE) == WAIT_OBJECT_0;//等待成功
+		ret = WaitForSingleObject(hEvent,INFINITE) == WAIT_OBJECT_0;//等待成功
 		if (ret) {
 			data = pParam.Data;
 		}
@@ -85,9 +89,10 @@ public:
 	size_t Size() {
 		HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);//用于同步等待pop操作完成,初始状态为非信号态
 		IocpParam pParam(EQSize, T(), hEvent);
-		if (m_lock)
+		if (m_lock) {
 			if (hEvent)CloseHandle(hEvent);
 			return -1;
+		}
 			//操作完成后，hEvent设置为信号态
 		bool ret = PostQueuedCompletionStatus(m_hCompeletionPort, sizeof(PPARAM),
 			(ULONG_PTR)&pParam, NULL);
@@ -99,7 +104,7 @@ public:
 		if (ret) {
 			return pParam.nOperator;
 		}
-		return ret;
+		return -1;
 	}
 	bool Clear() {
 		if (m_lock)
@@ -150,13 +155,14 @@ private:
 		PPARAM* pParam = NULL;
 		ULONG_PTR CompletionKey = 0;//存储完成包的标识
 		OVERLAPPED* pOverlapped = NULL;//异步（重叠）io操作
-		while (GetQueuedCompletionStatus(
+		while (GetQueuedCompletionStatus(//从iocp获取操作请求
 			m_hCompeletionPort, &dwTransferred,
 			&CompletionKey, &pOverlapped, INFINITE)) {
 			if ((dwTransferred == 0) || (CompletionKey == NULL)) {//没有更多的io操作，终止线程
 				printf("thread is prepare to exit!\r\n");
 				break;
 			}
+			//解析获得的key
 			pParam = (PPARAM*)CompletionKey;
 			DealParam(pParam);
 		}
@@ -172,7 +178,10 @@ private:
 			pParam = (PPARAM*)CompletionKey;
 			DealParam(pParam);
 		}
-		CloseHandle(m_hCompeletionPort);
+		HANDLE hTemp = m_hCompeletionPort;
+		m_hCompeletionPort = NULL;
+		CloseHandle(hTemp);
+
 	}
 private:
 	std::list<T> m_lstData;

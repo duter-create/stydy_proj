@@ -120,31 +120,65 @@ void func(void* arg) {
         printf("list is empty,no data\r\n");
     }
 }
+
+void test() {//performance test
+    //性能：CQueue的push性能高，pop性能仅1/4
+            //list push性能比pop低
+    printf("press any key to exit ...\r\n");
+    CQueue <std::string> lstStrings;
+    ULONGLONG tick0 = GetTickCount64(), tick = GetTickCount64(), total = GetTickCount64();
+    while (GetTickCount64() - total <= 1000) {//定期检查按键是否被按下
+        //完成端口 把请求和实现分离了
+        //if (GetTickCount64() - tick0 >= 5) {//写
+        lstStrings.PushBack("hello world");
+        tick0 = GetTickCount64();
+        // }
+         //Sleep(1);
+    }
+    size_t count = lstStrings.Size();
+    printf("exit done! size %d\r\n",count);
+    total = GetTickCount64();
+    while (GetTickCount64() - total <= 1000) {//定期检查按键是否被按下
+        //if (GetTickCount64() - tick >= 5) {//读
+        std::string str;
+        lstStrings.PopFront(str);
+        tick = GetTickCount64();
+        //printf("pop from queue:%s\r\n", str.c_str());
+  //  }
+    //Sleep(1);
+    }
+    printf("exit done! size %d\r\n", count - lstStrings.Size());
+    lstStrings.Clear();
+    //::exit(0);与endthread类似，会直接终止程序，不会调用析构函数，可能会导致内存泄露
+    std::list<std::string>lstData;
+    total = GetTickCount64();
+    while (GetTickCount64() - total <= 1000) {//定期检查按键是否被按下
+        lstData.push_back("hello world");
+    }
+    count = lstData.size();
+    printf("lstData push down! size :%d\r\n", lstData.size());
+    total = GetTickCount64();
+    while (GetTickCount64() - total <= 1000) {//定期检查按键是否被按下
+        if(lstData.size() > 0)
+            lstData.pop_front();
+    }
+    printf("lstData pop down! size :%d\r\n", (count - lstData.size())*4);
+}
+
+/*
+1 bug 测试/功能测试
+2 关键因素测试（内存泄露，运行的稳定性，条件性，线程安全）
+3 压力测试（可靠性测试）
+*/
+
 int main()
 {
     if (!ClassTool::Init())
         return 1;
-    printf("press any key to exit ...\r\n");
-    CQueue <std::string> lstStrings;
-    ULONGLONG tick0 = GetTickCount64(), tick = GetTickCount64();
-    while (_kbhit() == 0) {//定期检查按键是否被按下
-        //完成端口 把请求和实现分离了
-        if (GetTickCount64() - tick0 > 1300) {//读
-            lstStrings.PushBack("hello world");
-            tick0 = GetTickCount64();
-        }
-        if (GetTickCount64() - tick > 2000) {//写
-            std::string str;
-            lstStrings.PopFront(str);
-            printf("pop from queue:%s\r\n", str.c_str());
-        }
-        Sleep(1);
+    for (int i = 0; i < 10; i++) {
+        test();
     }
    
-    printf("exit done! size %d\r\n",lstStrings.Size());
-    lstStrings.Clear();
-    printf("exit done! size %d\r\n", lstStrings.Size());
-    ::exit(0);
 
     /*
     if (ClassTool::IsAdmin()) {
